@@ -1012,6 +1012,33 @@ html.platform-win32:not([data-theme]) .sidebar {
   color: #6f2b05;
 }
 
+/* ── Token usage badge ── */
+.token-usage-badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+  background: var(--panel-muted);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 8px;
+  white-space: nowrap;
+  gap: 5px;
+  -webkit-app-region: no-drag;
+}
+
+.token-usage-badge::before {
+  content: 'TOKENS';
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.7px;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
 .brand-btn {
   border: none;
   background: transparent;

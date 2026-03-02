@@ -27,4 +27,6 @@ contextBridge.exposeInMainWorld('studioApi', {
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
   openPath: (filePath) => ipcRenderer.invoke('shell:openPath', filePath),
   getPlatform: () => process.platform,
+  getTokenUsage: () => ipcRenderer.invoke('app:tokenUsage:get'),
+  resetTokenUsage: () => ipcRenderer.invoke('app:tokenUsage:reset'),
 });

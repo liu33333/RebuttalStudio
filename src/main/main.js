@@ -11,6 +11,8 @@ const {
   saveProject,
   loadAppSettings,
   saveAppSettings,
+  loadTokenUsage,
+  saveTokenUsage,
   PROJECTS_ROOT,
 } = require('./projectService');
 
@@ -266,6 +268,7 @@ async function runGeminiStage1Breakdown(profile = {}, content = '', conference =
   }
 
   const data = await res.json();
+  await addTokenUsage(data?.usageMetadata?.promptTokenCount, data?.usageMetadata?.candidatesTokenCount);
   const text = data?.candidates?.[0]?.content?.parts?.map((p) => p?.text || '').join('')?.trim();
   if (!text) {
     throw new Error('Gemini returned empty content for stage1 breakdown.');
@@ -400,6 +403,7 @@ async function runGeminiStage2Refine(profile = {}, payload = {}, conference = 'I
   }
 
   const data = await res.json();
+  await addTokenUsage(data?.usageMetadata?.promptTokenCount, data?.usageMetadata?.candidatesTokenCount);
   const text = data?.candidates?.[0]?.content?.parts?.map((p) => p?.text || '').join('')?.trim();
   if (!text) {
     throw new Error('Gemini returned empty content for stage2 refine.');
@@ -482,6 +486,7 @@ async function runGeminiStage4Condense(profile = {}, allSource = '') {
   }
 
   const data = await res.json();
+  await addTokenUsage(data?.usageMetadata?.promptTokenCount, data?.usageMetadata?.candidatesTokenCount);
   const text = data?.candidates?.[0]?.content?.parts?.map((p) => p?.text || '').join('')?.trim();
   if (!text) {
     throw new Error('Gemini returned empty content for stage4 condense.');
@@ -568,6 +573,7 @@ async function runGeminiStage4Refine(profile = {}, payload = {}) {
   }
 
   const data = await res.json();
+  await addTokenUsage(data?.usageMetadata?.promptTokenCount, data?.usageMetadata?.candidatesTokenCount);
   const text = data?.candidates?.[0]?.content?.parts?.map((p) => p?.text || '').join('')?.trim();
   if (!text) {
     throw new Error('Gemini returned empty content for stage4 refine.');
@@ -652,6 +658,7 @@ async function runGeminiStage5FinalRemarks(profile = {}, payload = {}) {
   }
 
   const data = await res.json();
+  await addTokenUsage(data?.usageMetadata?.promptTokenCount, data?.usageMetadata?.candidatesTokenCount);
   const text = data?.candidates?.[0]?.content?.parts?.map((p) => p?.text || '').join('')?.trim();
   if (!text) {
     throw new Error('Gemini returned empty content for stage5 final remarks.');
@@ -722,6 +729,7 @@ async function runGeminiWritingAntiAI(profile = {}, content = '') {
   }
 
   const data = await res.json();
+  await addTokenUsage(data?.usageMetadata?.promptTokenCount, data?.usageMetadata?.candidatesTokenCount);
   const text = data?.candidates?.[0]?.content?.parts?.map((p) => p?.text || '').join('')?.trim();
   if (!text) throw new Error('Gemini returned empty content for Writing Anti-AI.');
 
@@ -791,6 +799,7 @@ async function runGeminiTemplateRephrase(profile = {}, content = '') {
   }
 
   const data = await res.json();
+  await addTokenUsage(data?.usageMetadata?.promptTokenCount, data?.usageMetadata?.candidatesTokenCount);
   const text = data?.candidates?.[0]?.content?.parts?.map((p) => p?.text || '').join('')?.trim();
   if (!text) throw new Error('Gemini returned empty content for template rephrase.');
 
@@ -843,6 +852,7 @@ async function runOpenAICompatibleRequest(profile = {}, prompt = '', responseMim
   }
 
   const data = await res.json();
+  await addTokenUsage(data?.usage?.prompt_tokens, data?.usage?.completion_tokens);
   const text = data?.choices?.[0]?.message?.content?.trim();
   if (!text) {
     throw new Error('OpenAI-compatible provider returned empty content.');
@@ -997,6 +1007,19 @@ async function runOpenAITemplateRephrase(profile = {}, content = '') {
   return { text: out, raw: parsed };
 }
 
+// ── Session token usage accumulator ──────────────────────────
+let sessionTokens = { input: 0, output: 0 };
+
+async function initTokenUsage() {
+  sessionTokens = await loadTokenUsage();
+}
+
+async function addTokenUsage(inputDelta, outputDelta) {
+  sessionTokens.input += inputDelta || 0;
+  sessionTokens.output += outputDelta || 0;
+  await saveTokenUsage(sessionTokens);
+}
+
 function createWindow() {
   const isMac = process.platform === 'darwin';
   const win = new BrowserWindow({
@@ -1017,7 +1040,10 @@ function createWindow() {
   win.loadFile(path.join(__dirname, '../renderer/index.html'));
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(async () => {
+  await initTokenUsage();
+  createWindow();
+});
 app.on('window-all-closed', () => {
   clearAutosaveTimers();
   if (process.platform !== 'darwin') app.quit();
@@ -1190,6 +1216,12 @@ ipcMain.handle('app:text:antiAI', async (_event, payload) => {
   } else {
     throw new Error(`Writing Anti-AI does not support provider: ${providerKey}`);
   }
+});
+
+ipcMain.handle('app:tokenUsage:get', () => ({ ...sessionTokens }));
+ipcMain.handle('app:tokenUsage:reset', async () => {
+  sessionTokens = { input: 0, output: 0 };
+  await saveTokenUsage(sessionTokens);
 });
 
 ipcMain.handle('app:api:listModels', async (_event, payload) => {

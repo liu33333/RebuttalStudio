@@ -399,6 +399,7 @@ const apiModelHintEl = document.getElementById('apiModelHint');
 const apiModelSelectEl = document.getElementById('apiModelSelect');
 const detectModelsBtnEl = document.getElementById('detectModelsBtn');
 const activeModelBadgeEl = document.getElementById('activeModelBadge');
+const tokenUsageBadgeEl = document.getElementById('tokenUsageBadge');
 
 // Stage advance modal
 const stageAdvanceModalEl = document.getElementById('stageAdvanceModal');
@@ -680,6 +681,7 @@ async function runTemplatePolish() {
 
   try {
     const result = await window.studioApi.runTemplateRephrase({ providerKey, profile, content: raw });
+    fetchAndRenderTokenUsage();
     const polished = `${result?.text || ''}`.trim();
     templateRenderedOutputEl.value = polished || raw;
     await copyText(templateRenderedOutputEl.value);
@@ -1695,6 +1697,7 @@ async function runAntiAIReplacement() {
 
   try {
     const result = await window.studioApi.runWritingAntiAI({ providerKey, profile, content: selectedText });
+    fetchAndRenderTokenUsage();
     const newText = `${result?.text || ''}`.trim();
     if (!newText) throw new Error('Empty response from Writing Anti-AI.');
 
@@ -1944,6 +1947,7 @@ async function skill1_condense(allSource) {
     profile,
     allSource,
   });
+  fetchAndRenderTokenUsage();
   return `${result?.condensedMarkdown || ''}`.trim();
 }
 
@@ -1969,6 +1973,7 @@ async function skill2_refine(condensedMarkdown, followupQuestion, draft) {
     followupQuestion,
     draft,
   });
+  fetchAndRenderTokenUsage();
   return `${result?.refinedText || ''}`.trim();
 }
 
@@ -2374,6 +2379,7 @@ async function skill5_finalize(templateSource, reviewerSummaries) {
     templateSource,
     reviewerSummaries,
   });
+  fetchAndRenderTokenUsage();
   return `${result?.filledMarkdown || ''}`.trim();
 }
 
@@ -3397,6 +3403,7 @@ async function runStage2RefineOneResponse(responseId) {
       outline: draftCell.outline || '',
       conference: state.currentDoc?.conference || 'ICLR',
     });
+    fetchAndRenderTokenUsage();
     draftCell.draft = refined?.draft || draftCell.draft;
     stage2Map[resp.id] = draftCell;
     state.stage2Replies[state.activeReviewerIdx] = stage2Map;
@@ -3462,6 +3469,7 @@ async function runStage2RefineForResponses() {
         outline: draftCell.outline || '',
         conference: state.currentDoc?.conference || 'ICLR',
       });
+      fetchAndRenderTokenUsage();
       draftCell.draft = refined?.draft || draftCell.draft;
       stage2Map[resp.id] = draftCell;
     }
@@ -3494,6 +3502,7 @@ async function performBreakdown() {
 
   try {
     const result = await runStage1ApiBreakdown(rawText);
+    fetchAndRenderTokenUsage();
     data.scores = {
       ...data.scores,
       ...(result?.scores || {}),
@@ -3791,6 +3800,20 @@ function renderActiveModelBadge() {
   activeModelBadgeEl.classList.toggle('hidden', !text);
 }
 
+function renderTokenUsageBadge({ input, output }) {
+  if (!tokenUsageBadgeEl) return;
+  const fmt = (n) => n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n);
+  tokenUsageBadgeEl.textContent = `${fmt(input)} in | ${fmt(output)} out`;
+  tokenUsageBadgeEl.title = `Input: ${input.toLocaleString()} tokens | Output: ${output.toLocaleString()} tokens`;
+}
+
+async function fetchAndRenderTokenUsage() {
+  try {
+    const usage = await window.studioApi?.getTokenUsage?.();
+    if (usage) renderTokenUsageBadge(usage);
+  } catch (_) { /* non-critical */ }
+}
+
 function renderApiForm(providerKey = state.apiSettings.activeApiProvider) {
   const profile = getActiveApiProfile(providerKey);
   const guide = API_PROVIDER_GUIDE[providerKey] || {};
@@ -3933,6 +3956,8 @@ async function saveApiSettings() {
   });
   state.apiSettings = saved;
   renderActiveModelBadge();
+  window.studioApi?.resetTokenUsage?.();
+  renderTokenUsageBadge({ input: 0, output: 0 });
   closeModal('apiModal');
 }
 
@@ -4086,6 +4111,7 @@ async function init() {
   state.appSettings = await window.studioApi.getAppSettings();
   state.apiSettings = await window.studioApi.getApiSettings();
   renderActiveModelBadge();
+  renderTokenUsageBadge({ input: 0, output: 0 });
   autosaveInput.value = state.appSettings.defaultAutosaveIntervalSeconds;
   await loadProjects();
   renderWorkspace();

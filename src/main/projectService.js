@@ -3,6 +3,7 @@ const path = require('path');
 
 const PROJECTS_ROOT = path.resolve(process.cwd(), 'projects');
 const APP_SETTINGS_FILE = path.join(PROJECTS_ROOT, '_appsettings.json');
+const TOKEN_USAGE_FILE = path.join(PROJECTS_ROOT, '_tokenusage.json');
 
 const STAGE_KEYS = ['stage1', 'stage2', 'stage3', 'stage4', 'stage5'];
 
@@ -264,6 +265,22 @@ async function saveAppSettings(settings) {
   return normalized;
 }
 
+async function loadTokenUsage() {
+  await ensureProjectsRoot();
+  const parsed = await readJsonSafe(TOKEN_USAGE_FILE);
+  if (parsed.__error) {
+    return { input: 0, output: 0 };
+  }
+  return { input: parsed.input || 0, output: parsed.output || 0 };
+}
+
+async function saveTokenUsage(tokens) {
+  await ensureProjectsRoot();
+  const data = { input: tokens.input || 0, output: tokens.output || 0 };
+  await fs.writeFile(TOKEN_USAGE_FILE, JSON.stringify(data, null, 2), 'utf8');
+  return data;
+}
+
 module.exports = {
   APP_SETTINGS_FILE,
   PROJECTS_ROOT,
@@ -277,4 +294,6 @@ module.exports = {
   saveProject,
   loadAppSettings,
   saveAppSettings,
+  loadTokenUsage,
+  saveTokenUsage,
 };

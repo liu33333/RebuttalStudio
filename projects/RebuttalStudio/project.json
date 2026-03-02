@@ -2,10 +2,10 @@
   "projectName": "RebuttalStudio",
   "conference": "ICLR",
   "createdAt": "2026-02-15T09:23:41.000Z",
-  "updatedAt": "2026-03-02T20:27:56.251Z",
+  "updatedAt": "2026-03-02T20:45:33.428Z",
   "autosaveIntervalSeconds": 60,
-  "currentStage": "Final Remarks",
-  "activeReviewerIdx": 3,
+  "currentStage": "Breakdown",
+  "activeReviewerIdx": 0,
   "reviewers": [
     {
       "id": 0,
@@ -78,14 +78,14 @@
       "responses": [
         {
           "id": "Response1",
-          "title": "Novelty vs Direct LLM Use",
+          "title": "Novelty and Baseline Comparison",
           "source": "weakness",
           "source_id": "weakness1",
           "quoted_issue": "W1. Limited Novelty Over Direct LLM Use: The core technical contribution—feeding reviewer text into an LLM and structuring the output—is essentially a prompt-engineering pipeline wrapped in a UI. The paper does not demonstrate that Rebuttal Studio offers measurable advantages over a researcher directly using Claude or ChatGPT with a well-crafted prompt. A direct A/B baseline comparison is critically missing."
         },
         {
           "id": "Response2",
-          "title": "User Study Bias",
+          "title": "User Study Methodology and Bias",
           "source": "weakness",
           "source_id": "weakness2",
           "quoted_issue": "W2. User Study Sample and Selection Bias: The 47-participant study relies entirely on self-reported time measurements and convenience sampling (recruited via the authors' institution and social networks). There is no control group performing the same task without the tool. Without a randomized controlled comparison, the \"42% time reduction\" claim cannot be attributed specifically to Rebuttal Studio."
@@ -113,7 +113,7 @@
         },
         {
           "id": "Response6",
-          "title": "Prompt Transparency",
+          "title": "Prompt Transparency and Reproducibility",
           "source": "question",
           "source_id": "question2",
           "quoted_issue": "Q2. On Prompt Transparency: Are the system prompts used for each of the five stages publicly available? The reproducibility of a prompt-engineering system depends entirely on full disclosure of the prompt design, including any few-shot examples used."
@@ -748,9 +748,9 @@
     }
   },
   "stage1": {
-    "content": "Summary:\n\nThe paper presents Rebuttal Studio, an end-to-end AI-assisted platform for writing academic peer-review responses through a five-stage pipeline: (1) comment parsing and atomic issue decomposition, (2) response outline generation, (3) draft writing with style control, (4) follow-up handling, and (5) final formatting. Evaluated in a 47-participant user study and a real-world deployment processing 2,000+ rebuttals, the paper provides strong evidence of practical impact. This is a well-motivated, carefully engineered systems contribution that addresses a genuine bottleneck in academic research. I recommend acceptance.\n\nSoundness: 3: good\nPresentation: 4: excellent\nContribution: 3: good\nRating: 8: accept, good paper\nConfidence: 3: You are fairly confident in your assessment. It is unlikely, but not impossible, that you did not understand some parts of the submission or are unfamiliar with some related work.\nStrengths:\nAddresses a genuine and underserved need: rebuttal writing is high-stakes, time-intensive, and there are currently no purpose-built tools for this workflow.\nThe five-stage pipeline decomposition is principled and reflects the actual cognitive stages researchers go through—decomposing concerns, planning arguments, drafting, handling follow-ups, and formatting.\nAtomic issue decomposition is a novel and practically important contribution: it enforces comprehensive coverage and prevents vague umbrella responses that fail to satisfy reviewers.\nReal-world deployment data (2,000+ rebuttals processed) provides strong evidence of adoption beyond the controlled study and validates practical utility.\nOpenReview-specific LaTeX color rendering (Stage 3) and meta-reviewer template (Stage 5) show attention to real submission mechanics that most researchers find tedious and error-prone.\nWeaknesses:\n\nW1. No Randomized Control Condition: The user study measures time within subjects but lacks a between-subjects comparison against a control group using a direct LLM interface. While the reported 42% time reduction is promising, a controlled experiment would substantially strengthen the causal claim that Rebuttal Studio—rather than LLM access in general—drives the improvement.\n\nW2. Long-Term Behavioral Effects Not Studied: The paper does not discuss whether extended use of Rebuttal Studio might cause researchers to become over-reliant on AI-generated arguments, gradually eroding their ability to independently articulate their research contributions. This is an important question for any tool designed to assist—rather than replace—expert judgment.\n\nQuestions:\n\nQ1. On Data Privacy: The platform processes potentially sensitive content—unpublished results, confidential review text that may be under embargo, and proprietary research details. What are the server-side data retention policies? Are review contents transmitted to third-party LLM APIs, and if so, what contractual safeguards exist for data privacy and confidentiality?\n\nQ2. On Cross-Venue Generalization: The evaluation focuses on ICLR. Are there plans to extend the system to handle ACL (which uses different criteria and longer reviews), NeurIPS, CVPR, or journal-format reviews? If so, what changes to Stage 1 (decomposition) and Stage 5 (unified template) would be required, and are these differences superficial (format) or fundamental (workflow)?",
+    "content": "Summary:\n\nThe authors present Rebuttal Studio, a five-stage LLM-assisted pipeline for writing academic peer-review responses. The platform decomposes reviewer comments into atomic issues, generates response outlines, produces draft replies, handles follow-up questions, and formats the final submission for OpenReview. The system is evaluated in a user study with 47 participants. While the practical motivation is clear, significant concerns around novelty, evaluation rigor, and reproducibility prevent a positive recommendation.\n\nSoundness: 2: fair\nPresentation: 3: good\nContribution: 2: fair\nRating: 4: reject, not good enough\nConfidence: 3: You are fairly confident in your assessment. It is unlikely, but not impossible, that you did not understand some parts of the submission or are unfamiliar with some related work.\nStrengths:\nClear practical motivation: peer-review response is a genuine bottleneck for researchers at all career stages.\nThe five-stage pipeline design is intuitive and covers a coherent end-to-end rebuttal workflow.\nThe user study provides preliminary quantitative evidence (42% time reduction) that the tool is helpful.\nWeaknesses:\n\nW1. Limited Novelty Over Direct LLM Use: The core technical contribution—feeding reviewer text into an LLM and structuring the output—is essentially a prompt-engineering pipeline wrapped in a UI. The paper does not demonstrate that Rebuttal Studio offers measurable advantages over a researcher directly using Claude or ChatGPT with a well-crafted prompt. A direct A/B baseline comparison is critically missing.\n\nW2. User Study Sample and Selection Bias: The 47-participant study relies entirely on self-reported time measurements and convenience sampling (recruited via the authors' institution and social networks). There is no control group performing the same task without the tool. Without a randomized controlled comparison, the \"42% time reduction\" claim cannot be attributed specifically to Rebuttal Studio.\n\nW3. Single LLM Backend—No Ablation: The paper uses a single LLM backend throughout all experiments. There is no ablation examining how different model choices (GPT-4o, Gemini 1.5 Pro, Llama 3.1) affect output quality. Given that response quality depends heavily on the underlying model, this gap limits generalizability.\n\nW4. No Evaluation of Downstream Impact: The paper measures user-perceived efficiency but does not evaluate whether rebuttals generated with Rebuttal Studio actually improve reviewer scores or acceptance probability. The ultimate metric of a rebuttal tool is whether it helps papers succeed at the venue.\n\nQuestions:\n\nQ1. On Issue Grouping (Stage 1): How does the system determine whether multiple atomic issues should be grouped into a single response or addressed separately? What are the grouping heuristics, and how sensitive is final response quality to this grouping decision?\n\nQ2. On Prompt Transparency: Are the system prompts used for each of the five stages publicly available? The reproducibility of a prompt-engineering system depends entirely on full disclosure of the prompt design, including any few-shot examples used.",
     "history": [],
-    "lastEditedAt": "2026-03-01T12:52:48.368Z"
+    "lastEditedAt": "2026-03-02T20:45:32.221Z"
   },
   "stage2": {
     "content": "completed",
