@@ -1013,7 +1013,7 @@ function renderHomeLanding() {
 function renderReviewerTabs() {
   reviewerTabsEl.innerHTML = state.reviewers.map((r, idx) => {
     const active = idx === state.activeReviewerIdx ? ' active' : '';
-    const label = r.name ? `Reviewer ${r.name}` : `Reviewer ${idx + 1}`;
+    const label = r.name || String(idx + 1);
     return `<button class="reviewer-tab${active}" data-reviewer="${idx}">${escapeHTML(label)}</button>`;
   }).join('');
 
