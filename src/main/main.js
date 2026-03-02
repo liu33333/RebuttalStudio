@@ -993,14 +993,15 @@ async function runOpenAITemplateRephrase(profile = {}, content = '') {
 }
 
 function createWindow() {
+  const isMac = process.platform === 'darwin';
   const win = new BrowserWindow({
     width: 1800,
     height: 1280,
-    transparent: true,
-    vibrancy: 'under-window',
+    transparent: isMac,
+    ...(isMac && { vibrancy: 'under-window' }),
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 20 },
-    backgroundColor: '#00000000',
+    backgroundColor: isMac ? '#00000000' : '#0a0a0a',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

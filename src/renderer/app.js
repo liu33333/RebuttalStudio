@@ -4028,6 +4028,7 @@ function syncStageUi() {
    Init
    ──────────────────────────────────────────────────────────── */
 async function init() {
+  document.documentElement.classList.add('platform-' + window.studioApi.getPlatform());
   loadTheme();
   await loadTemplateLibrary();
   await loadStage3StyleLibrary();

@@ -943,6 +943,13 @@ select {
   background: rgba(241, 240, 241, 0.9);
 }
 
+/* Windows: sidebar must be fully opaque (backdrop-filter unreliable on Win32) */
+html.platform-win32[data-theme="dark"] .sidebar,
+html.platform-win32[data-theme="light"] .sidebar,
+html.platform-win32:not([data-theme]) .sidebar {
+  background: var(--panel);
+}
+
 .topbar button,
 .topbar input,
 .topbar a,
