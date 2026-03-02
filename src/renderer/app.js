@@ -989,7 +989,10 @@ function buildFeedbackIssueUrl(rawFeedback = '') {
   const titleCore = compact ? compact.slice(0, 72) : 'Feedback about Rebuttal Studio';
   const title = `[Feedback] ${titleCore}`;
   const description = cleaned || '(No additional description provided.)';
-  const body = `## DESCRIPTION\n${description}\n\n## SOURCE\nSubmitted from Rebuttal Studio home feedback box.`;
+  const platformMap = { darwin: 'macOS', win32: 'Windows', linux: 'Linux' };
+  const rawPlatform = window.studioApi?.getPlatform?.() ?? 'unknown';
+  const os = platformMap[rawPlatform] ?? rawPlatform;
+  const body = `## DESCRIPTION\n${description}\n\n## ENVIRONMENT\nOS: ${os}\n\n## SOURCE\nSubmitted from Rebuttal Studio home feedback box.`;
   const issueUrl = new URL('https://github.com/runtsang/RebuttalStudio/issues/new');
   issueUrl.searchParams.set('title', title);
   issueUrl.searchParams.set('body', body);
@@ -4029,6 +4032,7 @@ function syncStageUi() {
    ──────────────────────────────────────────────────────────── */
 async function init() {
   document.documentElement.classList.add('platform-' + window.studioApi.getPlatform());
+  if (homeFeedbackInputEl) homeFeedbackInputEl.value = '';
   loadTheme();
   await loadTemplateLibrary();
   await loadStage3StyleLibrary();
