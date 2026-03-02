@@ -145,7 +145,7 @@ async function listProviderModels(providerKey, profile = {}) {
       return { models: names, hint: 'Gemini models are loaded from Google AI Studio ListModels API.' };
     }
 
-    const openaiCompatible = ['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom'];
+    const openaiCompatible = ['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom', 'openrouter', 'groq', 'grok', 'together', 'kimi', 'minimax', 'huggingface', 'portkey', 'bedrock'];
     if (openaiCompatible.includes(providerKey)) {
       if (providerKey === 'azureOpenai') {
         return {
@@ -823,11 +823,16 @@ async function runOpenAICompatibleRequest(profile = {}, prompt = '', responseMim
     body.response_format = { type: 'json_object' };
   }
 
+  const isOpenRouter = baseUrl.includes('openrouter.ai');
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
+      ...(isOpenRouter && {
+        'HTTP-Referer': 'https://github.com/runtsang/RebuttalStudio',
+        'X-Title': 'Rebuttal Studio',
+      }),
     },
     body: JSON.stringify(body),
   });
@@ -1058,7 +1063,7 @@ ipcMain.handle('app:stage1:breakdown', async (_event, payload) => {
 
   if (providerKey === 'gemini') {
     return runGeminiStage1Breakdown(profile, content, conference);
-  } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom'].includes(providerKey)) {
+  } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom', 'openrouter', 'groq', 'grok', 'together', 'kimi', 'minimax', 'huggingface', 'portkey', 'bedrock'].includes(providerKey)) {
     return runOpenAIStage1Breakdown(profile, content, conference);
   } else {
     throw new Error(`Stage1 breakdown does not support provider: ${providerKey}`);
@@ -1081,7 +1086,7 @@ ipcMain.handle('app:stage2:refine', async (_event, payload) => {
 
   if (providerKey === 'gemini') {
     return runGeminiStage2Refine(profile, body, conference);
-  } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom'].includes(providerKey)) {
+  } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom', 'openrouter', 'groq', 'grok', 'together', 'kimi', 'minimax', 'huggingface', 'portkey', 'bedrock'].includes(providerKey)) {
     return runOpenAIStage2Refine(profile, body, conference);
   } else {
     throw new Error(`Stage2 refine does not support provider: ${providerKey}`);
@@ -1095,7 +1100,7 @@ ipcMain.handle('app:stage4:condense', async (_event, payload) => {
 
   if (providerKey === 'gemini') {
     return runGeminiStage4Condense(profile, allSource);
-  } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom'].includes(providerKey)) {
+  } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom', 'openrouter', 'groq', 'grok', 'together', 'kimi', 'minimax', 'huggingface', 'portkey', 'bedrock'].includes(providerKey)) {
     return runOpenAIStage4Condense(profile, allSource);
   } else {
     throw new Error(`Stage4 condense does not support provider: ${providerKey}`);
@@ -1122,7 +1127,7 @@ ipcMain.handle('app:stage4:refine', async (_event, payload) => {
 
   if (providerKey === 'gemini') {
     return runGeminiStage4Refine(profile, body);
-  } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom'].includes(providerKey)) {
+  } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom', 'openrouter', 'groq', 'grok', 'together', 'kimi', 'minimax', 'huggingface', 'portkey', 'bedrock'].includes(providerKey)) {
     return runOpenAIStage4Refine(profile, body);
   } else {
     throw new Error(`Stage4 refine does not support provider: ${providerKey}`);
@@ -1148,7 +1153,7 @@ ipcMain.handle('app:stage5:finalize', async (_event, payload) => {
       templateSource,
       reviewerSummaries,
     });
-  } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom'].includes(providerKey)) {
+  } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom', 'openrouter', 'groq', 'grok', 'together', 'kimi', 'minimax', 'huggingface', 'portkey', 'bedrock'].includes(providerKey)) {
     return runOpenAIStage5FinalRemarks(profile, {
       templateSource,
       reviewerSummaries,
@@ -1166,7 +1171,7 @@ ipcMain.handle('app:template:rephrase', async (_event, payload) => {
 
   if (providerKey === 'gemini') {
     return runGeminiTemplateRephrase(profile, content);
-  } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom'].includes(providerKey)) {
+  } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom', 'openrouter', 'groq', 'grok', 'together', 'kimi', 'minimax', 'huggingface', 'portkey', 'bedrock'].includes(providerKey)) {
     return runOpenAITemplateRephrase(profile, content);
   } else {
     throw new Error(`Template AI polish does not support provider: ${providerKey}`);
@@ -1180,7 +1185,7 @@ ipcMain.handle('app:text:antiAI', async (_event, payload) => {
 
   if (providerKey === 'gemini') {
     return runGeminiWritingAntiAI(profile, content);
-  } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom'].includes(providerKey)) {
+  } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom', 'openrouter', 'groq', 'grok', 'together', 'kimi', 'minimax', 'huggingface', 'portkey', 'bedrock'].includes(providerKey)) {
     return runOpenAIWritingAntiAI(profile, content);
   } else {
     throw new Error(`Writing Anti-AI does not support provider: ${providerKey}`);

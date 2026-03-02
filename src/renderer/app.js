@@ -303,7 +303,7 @@ const homeFeedbackInputEl = document.getElementById('homeFeedbackInput');
 const homeSendBtnEl = document.getElementById('homeSendBtn');
 
 
-const API_PROVIDER_KEYS = ['openai', 'anthropic', 'gemini', 'deepseek', 'azureOpenai', 'qwen', 'custom'];
+const API_PROVIDER_KEYS = ['openai', 'anthropic', 'gemini', 'deepseek', 'azureOpenai', 'qwen', 'openrouter', 'groq', 'grok', 'together', 'kimi', 'minimax', 'huggingface', 'portkey', 'bedrock', 'custom'];
 
 
 const API_PROVIDER_GUIDE = {
@@ -336,6 +336,51 @@ const API_PROVIDER_GUIDE = {
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     model: 'qwen-plus',
     baseUrlHelp: 'Alibaba DashScope compatible-mode endpoint. Get your API key from console.aliyun.com. Common models: qwen-turbo, qwen-plus, qwen-max.',
+  },
+  openrouter: {
+    baseUrl: 'https://openrouter.ai/api/v1',
+    model: 'openai/gpt-4o-mini',
+    baseUrlHelp: 'OpenRouter unified gateway — access 200+ models with one API key. Get your key at openrouter.ai/keys.',
+  },
+  groq: {
+    baseUrl: 'https://api.groq.com/openai/v1',
+    model: 'llama-3.3-70b-versatile',
+    baseUrlHelp: 'Groq fast inference. Get your API key at console.groq.com. Common models: llama-3.3-70b-versatile, mixtral-8x7b-32768, gemma2-9b-it.',
+  },
+  grok: {
+    baseUrl: 'https://api.x.ai/v1',
+    model: 'grok-3',
+    baseUrlHelp: 'xAI Grok endpoint. Get your API key at console.x.ai. Common models: grok-3, grok-2, grok-beta.',
+  },
+  together: {
+    baseUrl: 'https://api.together.xyz/v1',
+    model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+    baseUrlHelp: 'Together AI — 200+ open-source models. Get your API key at api.together.ai. Use "Detect models" to browse available models.',
+  },
+  kimi: {
+    baseUrl: 'https://api.moonshot.cn/v1',
+    model: 'moonshot-v1-8k',
+    baseUrlHelp: 'Kimi (Moonshot AI) endpoint. Get your API key at platform.moonshot.cn. Common models: moonshot-v1-8k, moonshot-v1-32k, moonshot-v1-128k.',
+  },
+  minimax: {
+    baseUrl: 'https://api.minimax.chat/v1',
+    model: 'MiniMax-Text-01',
+    baseUrlHelp: 'MiniMax API endpoint. Get your API key at platform.minimax.chat. Common models: MiniMax-Text-01, abab6.5s-chat.',
+  },
+  huggingface: {
+    baseUrl: 'https://router.huggingface.co/v1',
+    model: 'Qwen/Qwen2.5-72B-Instruct',
+    baseUrlHelp: 'HuggingFace Inference Router. Use your HF access token from huggingface.co/settings/tokens. Use "Detect models" to browse supported models.',
+  },
+  portkey: {
+    baseUrl: 'https://api.portkey.ai/v1',
+    model: 'gpt-4o-mini',
+    baseUrlHelp: 'Portkey AI gateway — routes to 200+ providers. Get your API key at app.portkey.ai. Configure a virtual key or default route in your Portkey dashboard first.',
+  },
+  bedrock: {
+    baseUrl: 'https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1',
+    model: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+    baseUrlHelp: 'AWS Bedrock OpenAI-compatible endpoint. Replace the region in the URL (e.g. us-west-2). Use a Bedrock API key from the AWS console.',
   },
   custom: {
     baseUrl: '',
