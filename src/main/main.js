@@ -203,6 +203,10 @@ function buildStage1Prompt(content, conference = 'ICLR') {
     scoreKeys = ['rating', 'confidence', 'soundness', 'presentation', 'significance', 'originality'];
     sectionsSchema = {"summary":"","strength":"","weakness":"","questions":""};
     atomicSources = 'weakness and question/questions';
+  } else if (conf === 'NEURIPS') {
+    scoreKeys = ['rating', 'confidence', 'quality', 'clarity', 'significance', 'originality'];
+    sectionsSchema = {"summary":"","strength":"","weakness":"","questions":""};
+    atomicSources = 'weakness/questions and limitations';
   } else if (conf === 'ARR') {
     scoreKeys = ['confidence', 'soundness', 'excitement', 'assessment', 'reproducibility'];
     sectionsSchema = {"summary":"","strength":"","weakness":"","suggestion":""};
@@ -306,6 +310,8 @@ function normalizeStage1Breakdown(payload = {}, conference = 'ICLR') {
   let scoreKeys;
   if (conf === 'ICML') {
     scoreKeys = ['rating', 'confidence', 'soundness', 'presentation', 'significance', 'originality'];
+  } else if (conf === 'NEURIPS') {
+    scoreKeys = ['rating', 'confidence', 'quality', 'clarity', 'significance', 'originality'];
   } else if (conf === 'ARR') {
     scoreKeys = ['confidence', 'soundness', 'excitement', 'assessment', 'reproducibility'];
   } else {

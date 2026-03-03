@@ -116,6 +116,66 @@ Rate the originality of the paper.<br>
 1 = Poor: Little to no originality`,
     },
   },
+  NeurIPS: {
+    scores: [
+      { key: 'rating', label: 'Rating', default: 'A' },
+      { key: 'confidence', label: 'Confidence', default: 'B' },
+    ],
+    metrics: [
+      { key: 'quality', label: 'Quality', default: 'C' },
+      { key: 'clarity', label: 'Clarity', default: 'D' },
+      { key: 'significance', label: 'Significance', default: 'E' },
+      { key: 'originality', label: 'Originality', default: 'F' },
+    ],
+    sections: [
+      { key: 'summary', label: 'Summary', placeholder: 'Paper summary.' },
+      { key: 'strength', label: 'Strengths And Weaknesses', placeholder: 'Strengths and weaknesses of the paper.' },
+      { key: 'weakness', label: 'Questions', placeholder: 'Questions for the authors.' },
+      { key: 'questions', label: 'Limitations', placeholder: 'Limitations of the work.' },
+    ],
+    // Group sections into blocks: [ [summary, strengths/weaknesses], [questions, limitations] ]
+    blocks: [[0, 1], [2, 3]],
+    // Tooltips with NeurIPS scale definitions
+    tooltips: {
+      rating: `<strong>Overall Score (1–6 Scale)</strong><br>
+6 = Strong Accept: Technically flawless paper with groundbreaking impact; exceptionally strong evaluation, reproducibility, and no unaddressed ethical considerations.<br>
+5 = Accept: Technically solid paper with high impact on at least one sub-area or moderate-to-high impact on multiple areas; good-to-excellent evaluation.<br>
+4 = Borderline Accept: Technically solid paper where reasons to accept outweigh reasons to reject (e.g., limited evaluation).<br>
+3 = Borderline Reject: Technically solid paper where reasons to reject outweigh reasons to accept. Please use sparingly.<br>
+2 = Reject: Technical flaws, weak evaluation, inadequate reproducibility, or incompletely addressed ethical considerations.<br>
+1 = Strong Reject: Well-known results, unaddressed ethical considerations, or paper where contributions are unclear.`,
+      confidence: `<strong>Confidence (1–5 Scale)</strong><br>
+5 = Absolutely certain. Very familiar with related work and checked math/details carefully.<br>
+4 = Confident but not absolutely certain. Unlikely but not impossible you missed some parts or related work.<br>
+3 = Fairly confident. Possible you didn't understand some parts or are unfamiliar with some related work. Details not carefully checked.<br>
+2 = Willing to defend your assessment, but quite likely you missed central parts or are unfamiliar with related work.<br>
+1 = Educated guess. Submission not in your area or difficult to understand. Math/details not carefully checked.`,
+      quality: `<strong>Quality (1–4 Scale)</strong><br>
+Rate the overall quality of the work based on your discussion in Strengths and Weaknesses.<br>
+4 = Excellent: Outstanding quality across methodology, experiments, and conclusions.<br>
+3 = Good: Solid quality with only minor or moderate issues.<br>
+2 = Fair: Notable weaknesses; partially convincing but important issues remain.<br>
+1 = Poor: Major flaws in methodology, experimental design, or central claims.`,
+      clarity: `<strong>Clarity (1–4 Scale)</strong><br>
+Rate the clarity of the paper's writing and presentation.<br>
+4 = Excellent: Very clearly written, well organized, and easy to follow.<br>
+3 = Good: Generally clear with only minor presentation issues.<br>
+2 = Fair: Understandable overall but notable issues in exposition or organization.<br>
+1 = Poor: Hard to follow; important parts are confusing, unclear, or missing.`,
+      significance: `<strong>Significance (1–4 Scale)</strong><br>
+Rate the significance of the paper's contribution to the field.<br>
+4 = Excellent: Groundbreaking or highly impactful contribution to the community.<br>
+3 = Good: Solid contribution with clear significance to the area.<br>
+2 = Fair: Limited impact; contribution is incremental or has important caveats.<br>
+1 = Poor: Little or no significance; results are well-known or of very limited scope.`,
+      originality: `<strong>Originality (1–4 Scale)</strong><br>
+Rate the originality of the paper's ideas and approach.<br>
+4 = Excellent: Highly novel ideas, methodology, or perspective; clearly advances the frontier.<br>
+3 = Good: Original contribution with meaningful novelty beyond prior work.<br>
+2 = Fair: Limited novelty; mostly incremental over existing methods or ideas.<br>
+1 = Poor: Little to no originality; closely reproduces or barely extends prior work.`,
+    },
+  },
   ARR: {
     scores: [
       { key: 'assessment', label: 'Assessment', default: 'A' },
