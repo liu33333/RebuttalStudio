@@ -127,9 +127,10 @@ We deeply appreciate every contributor's effort — **you deserve this credit**.
 
 - [ ] **Robustness** — Improve system resilience to handle diverse input formats and edge cases gracefully.
 - [ ] **Multi-Platform API Support** — Extend LLM integration beyond the current setup to support more API providers (e.g., OpenAI, Anthropic, Google Gemini, local models).
-- [ ] **More Conference Templates** — Add built-in support for additional venues: ICML, NeurIPS, EMNLP, ACL, CVPR, ICLR, and more.
-- [ ] **Higher-Quality Templates** — Enrich the template library with more professionally crafted response patterns and examples.
-- [ ] **Enhanced Stage Skills** — Introduce more specialized skills at each pipeline stage (e.g., tone adjustment, evidence structuring, counter-argument generation) for more professional polishing.
+- [x] **More Conference Templates** — ✅ Added built-in support for ICLR, ICML, ARR (ACL, EMNLP), and NeurIPS with complete review rubrics.
+- [x] **Higher-Quality Templates** — ✅ Enhanced all conference templates with detailed scoring scales (1-6 ratings, 4-point scales, etc.), interactive "?" tooltips for each metric, and structured section layouts.
+- [ ] **Enhanced Stage Skills** — Introduce more specialized skills at each pipeline stage (e.g., tone adjustment, evidence structuring, counter-argument generation) for more professional polishing. *[Partial: Created stage1/stage2 skills for ICLR, ICML, ARR, NeurIPS]*
+- [ ] **Additional Venues** — Add more conference templates: EMNLP (standalone), ACL, CVPR, ECCV, NAACL, and others.
 
 ### Long-Term Goals
 
