@@ -62,6 +62,16 @@ function normalizeAppSettings(raw = {}) {
     };
   });
 
+  // Preserve non-default providers (e.g. openrouter, groq, grok, etc.)
+  Object.keys(rawProfiles).forEach((providerKey) => {
+    if (apiProfiles[providerKey]) return;
+    const p = rawProfiles[providerKey];
+    apiProfiles[providerKey] = {
+      ...p,
+      apiKey: typeof p.apiKey === 'string' ? p.apiKey : '',
+    };
+  });
+
   const activeApiProvider = apiProfiles[raw.activeApiProvider] ? raw.activeApiProvider : defaults.activeApiProvider;
 
   return {
