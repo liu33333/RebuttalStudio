@@ -1743,6 +1743,8 @@ function ensureStage3SourceMenu() {
     <button class="stage2-outline-menu-item" data-stage3-format="color">Color</button>
     <button class="stage2-outline-menu-item" data-stage3-format="h1">Large Heading</button>
     <button class="stage2-outline-menu-item" data-stage3-format="h2">Small Heading</button>
+    <div class="stage2-outline-menu-divider"></div>
+    <button class="stage2-outline-menu-item" data-stage3-format="anti-ai">✦ Anti-AI</button>
   `;
   document.body.appendChild(menu);
   return menu;
@@ -4873,11 +4875,6 @@ stage2LeftPanelEl.addEventListener('contextmenu', (e) => {
   }
 
   if (target?.dataset?.stage3Field === 'markdownSource') {
-    // When text is selected, show Writing Anti-AI instead of formatting menu
-    if (target.selectionStart !== target.selectionEnd) {
-      showAntiAIMenu(e, target);
-      return;
-    }
     e.preventDefault();
     const responseId = target.dataset.responseId;
     stage3SourceContext = {
@@ -4887,6 +4884,16 @@ stage2LeftPanelEl.addEventListener('contextmenu', (e) => {
       start: target.selectionStart || 0,
       end: target.selectionEnd || 0,
     };
+    // Pre-populate Anti-AI state so ✦ Anti-AI works if clicked
+    if (target.selectionStart !== target.selectionEnd) {
+      antiAIState.element = target;
+      antiAIState.type = 'textarea';
+      antiAIState.selectedText = target.value.substring(target.selectionStart, target.selectionEnd);
+      antiAIState.selStart = target.selectionStart;
+      antiAIState.selEnd = target.selectionEnd;
+      antiAIState.originalValue = target.value;
+      antiAIState.savedRange = null;
+    }
     const menu = ensureStage3SourceMenu();
     menu.style.left = `${e.clientX}px`;
     menu.style.top = `${e.clientY}px`;
@@ -4949,8 +4956,12 @@ document.addEventListener('click', (e) => {
   if (stage3Fmt) {
     const action = stage3Fmt.dataset.stage3Format;
     hideStage3SourceMenu();
-    if (action) applyStage3SourceFormat(action);
     hideStage2ContextMenu();
+    if (action === 'anti-ai') {
+      runAntiAIReplacement();
+    } else if (action) {
+      applyStage3SourceFormat(action);
+    }
     return;
   }
 
