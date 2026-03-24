@@ -119,6 +119,7 @@ async function readJsonSafe(filePath) {
 }
 
 async function saveProjectDoc(projectName, projectDoc) {
+  if (projectDoc.isExample === true) return null;
   const safeName = sanitizeProjectName(projectName);
   const projectDir = path.join(PROJECTS_ROOT, safeName);
   const projectFile = path.join(projectDir, 'project.json');
@@ -238,6 +239,7 @@ async function deleteProject(folderName) {
 }
 
 async function saveProject(folderName, projectDoc) {
+  if (projectDoc.isExample === true) return projectDoc;
   const now = new Date().toISOString();
   const nextDoc = {
     ...projectDoc,
