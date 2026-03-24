@@ -102,6 +102,20 @@ npm start
 
 ---
 
+## 🌟 Examples
+
+<p align="center">
+  <b>Example 1: Point-to-Point response</b><br>
+  <img src="img/ex1.jpg" alt="Example 1" width="800"/>
+</p>
+
+<p align="center">
+  <b>Example 2: Final remarks</b><br>
+  <img src="img/ex2.jpg" alt="Example 2" width="800"/>
+</p>
+
+---
+
 ## 🤝 Contributing
 
 **We warmly welcome contributions from everyone!** Whether it's a bug fix, a new feature, improved templates, or better documentation — every contribution makes Rebuttal Studio better for the entire research community.
@@ -112,7 +126,7 @@ This project was built from scratch in **a single weekend (~15 hours)** by a sol
 
 ### 📝 Technical Report & Authorship
 
-We plan to release a **technical report on arXiv** before the ICML 2026 rebuttal period begins (**by March 24, 2026**). Here's our commitment to contributors:
+We plan to release a **technical report on arXiv** before the NeurIPS 2026 rebuttal period begins (**Around July, 2026**). Here's our commitment to contributors:
 
 - ✅ **All contributors** whose pull requests are merged into the `master` branch are welcome to **opt in as authors** on the technical report.
 - 🌟 **Outstanding contributors** will be additionally recognized and labeled as **Main Contributors**.
