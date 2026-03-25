@@ -8,6 +8,9 @@ const {
   loadProject,
   renameProject,
   copyProject,
+  createProjectSnapshot,
+  listProjectSnapshots,
+  restoreProjectSnapshot,
   deleteProject,
   saveProject,
   loadAppSettings,
@@ -1300,6 +1303,29 @@ ipcMain.handle('projects:copy', async (_event, folderName) => {
     await persistNow();
   }
   return copyProject(folderName);
+});
+
+ipcMain.handle('projects:snapshot:create', async (_event, folderName) => {
+  const liveDoc = autosaveState.currentFolder === folderName ? autosaveState.currentDoc : null;
+  const result = await createProjectSnapshot(folderName, liveDoc);
+  if (autosaveState.currentFolder === folderName) {
+    autosaveState.currentDoc = result.doc;
+  }
+  return result;
+});
+
+ipcMain.handle('projects:snapshot:list', async (_event, folderName) => {
+  const liveDoc = autosaveState.currentFolder === folderName ? autosaveState.currentDoc : null;
+  return listProjectSnapshots(folderName, liveDoc);
+});
+
+ipcMain.handle('projects:snapshot:restore', async (_event, { folderName, snapshotId }) => {
+  const liveDoc = autosaveState.currentFolder === folderName ? autosaveState.currentDoc : null;
+  const result = await restoreProjectSnapshot(folderName, snapshotId, liveDoc);
+  if (autosaveState.currentFolder === folderName) {
+    autosaveState.currentDoc = result.doc;
+  }
+  return result;
 });
 
 ipcMain.handle('projects:exportFirstRound', async (event, { folderName, format, markdown, htmlStr }) => {

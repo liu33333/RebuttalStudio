@@ -106,6 +106,7 @@ function createProjectDoc(projectName, conference, autosaveIntervalSeconds) {
     stage4Data: {},
     stage5Data: {},
     stage5Settings: { style: 'run' },
+    snapshots: [],
   };
 
   STAGE_KEYS.forEach((stageKey) => {
@@ -113,6 +114,34 @@ function createProjectDoc(projectName, conference, autosaveIntervalSeconds) {
   });
 
   return doc;
+}
+
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function buildSnapshotLabel(isoString) {
+  const stamp = `${isoString || ''}`.replace('T', ' ').slice(0, 19);
+  return `Snapshot ${stamp || 'Untitled'}`;
+}
+
+function buildProjectSnapshotDoc(projectDoc = {}) {
+  const snapshotDoc = cloneJson(projectDoc);
+  delete snapshotDoc.snapshots;
+  return snapshotDoc;
+}
+
+function normalizeSnapshots(rawSnapshots = []) {
+  if (!Array.isArray(rawSnapshots)) return [];
+  return rawSnapshots
+    .filter((snapshot) => snapshot && typeof snapshot === 'object' && snapshot.id && snapshot.doc)
+    .map((snapshot) => ({
+      id: `${snapshot.id}`,
+      label: `${snapshot.label || buildSnapshotLabel(snapshot.createdAt || '')}`,
+      createdAt: `${snapshot.createdAt || new Date().toISOString()}`,
+      currentStage: `${snapshot.currentStage || snapshot.doc?.currentStage || ''}`,
+      doc: cloneJson(snapshot.doc),
+    }));
 }
 
 async function ensureProjectsRoot() {
@@ -272,6 +301,66 @@ async function copyProject(folderName) {
   return { folderName: targetFolder, doc: savedDoc };
 }
 
+async function createProjectSnapshot(folderName, projectDoc = null) {
+  const workingDoc = projectDoc ? cloneJson(projectDoc) : await loadProject(folderName);
+  const snapshots = normalizeSnapshots(workingDoc.snapshots);
+  const createdAt = new Date().toISOString();
+  const snapshot = {
+    id: `snapshot_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    label: buildSnapshotLabel(createdAt),
+    createdAt,
+    currentStage: workingDoc.currentStage || '',
+    doc: buildProjectSnapshotDoc(workingDoc),
+  };
+  workingDoc.snapshots = [snapshot, ...snapshots];
+  const savedDoc = await saveProject(folderName, workingDoc);
+  return {
+    folderName,
+    doc: savedDoc,
+    snapshot: {
+      id: snapshot.id,
+      label: snapshot.label,
+      createdAt: snapshot.createdAt,
+      currentStage: snapshot.currentStage,
+    },
+  };
+}
+
+async function listProjectSnapshots(folderName, projectDoc = null) {
+  const workingDoc = projectDoc ? cloneJson(projectDoc) : await loadProject(folderName);
+  return normalizeSnapshots(workingDoc.snapshots).map((snapshot) => ({
+    id: snapshot.id,
+    label: snapshot.label,
+    createdAt: snapshot.createdAt,
+    currentStage: snapshot.currentStage,
+  }));
+}
+
+async function restoreProjectSnapshot(folderName, snapshotId, projectDoc = null) {
+  const workingDoc = projectDoc ? cloneJson(projectDoc) : await loadProject(folderName);
+  const snapshots = normalizeSnapshots(workingDoc.snapshots);
+  const target = snapshots.find((snapshot) => snapshot.id === `${snapshotId || ''}`);
+  if (!target) {
+    throw new Error('Snapshot not found.');
+  }
+
+  const restoredDoc = {
+    ...cloneJson(target.doc),
+    snapshots,
+  };
+  const savedDoc = await saveProject(folderName, restoredDoc);
+  return {
+    folderName,
+    doc: savedDoc,
+    snapshot: {
+      id: target.id,
+      label: target.label,
+      createdAt: target.createdAt,
+      currentStage: target.currentStage,
+    },
+  };
+}
+
 async function deleteProject(folderName) {
   await ensureProjectsRoot();
   const safeFolder = sanitizeProjectName(folderName || '');
@@ -338,6 +427,9 @@ module.exports = {
   loadProject,
   renameProject,
   copyProject,
+  createProjectSnapshot,
+  listProjectSnapshots,
+  restoreProjectSnapshot,
   deleteProject,
   saveProject,
   loadAppSettings,

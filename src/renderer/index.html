@@ -499,6 +499,21 @@
     </div>
   </div>
 
+  <!-- Project Snapshots Modal -->
+  <div id="projectSnapshotsModal" class="modal-backdrop hidden">
+    <div class="modal project-snapshots-modal" role="dialog" aria-modal="true" aria-labelledby="projectSnapshotsTitle">
+      <h3 id="projectSnapshotsTitle">Restore Snapshot</h3>
+      <p id="projectSnapshotsHint" class="muted">Select a saved snapshot to restore.</p>
+      <div id="projectSnapshotsList" class="project-snapshots-list">
+        <p class="muted">Loading snapshots...</p>
+      </div>
+      <p id="projectSnapshotsError" class="error"></p>
+      <div class="modal-actions">
+        <button id="closeProjectSnapshotsBtn" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Right-click context menu for reviewer tabs -->
   <div id="reviewerContextMenu" class="context-menu hidden">
     <button class="context-menu-item" data-action="rename">✏️ Rename</button>
@@ -508,6 +523,8 @@
   <div id="projectContextMenu" class="context-menu hidden">
     <button class="context-menu-item" data-action="rename">Rename</button>
     <button class="context-menu-item" data-action="copy">Copy</button>
+    <button class="context-menu-item" data-action="snapshot-create">Add Snapshot</button>
+    <button class="context-menu-item" data-action="snapshot-restore">Restore Snapshot</button>
     <button class="context-menu-item" data-action="delete">Delete</button>
   </div>
 

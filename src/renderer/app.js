@@ -413,6 +413,7 @@ const antiAIState = {
 };
 let exportTargetFolder = null;
 let pendingProjectRenameResolver = null;
+let projectSnapshotsFolderName = null;
 let stage2ModalTargetResponseId = null;
 let stage2TableRows = 3;
 let stage2TableCols = 3;
@@ -465,6 +466,11 @@ const projectRenameInputEl = document.getElementById('projectRenameInput');
 const projectRenameErrorEl = document.getElementById('projectRenameError');
 const confirmProjectRenameBtnEl = document.getElementById('confirmProjectRenameBtn');
 const cancelProjectRenameBtnEl = document.getElementById('cancelProjectRenameBtn');
+const projectSnapshotsModalEl = document.getElementById('projectSnapshotsModal');
+const projectSnapshotsHintEl = document.getElementById('projectSnapshotsHint');
+const projectSnapshotsListEl = document.getElementById('projectSnapshotsList');
+const projectSnapshotsErrorEl = document.getElementById('projectSnapshotsError');
+const closeProjectSnapshotsBtnEl = document.getElementById('closeProjectSnapshotsBtn');
 
 const sidebarEl = document.getElementById('sidebar');
 const sidebarProjectsEl = document.getElementById('sidebarProjects');
@@ -1213,6 +1219,88 @@ async function copyProjectFromContext(folderName) {
   return result;
 }
 
+function renderProjectSnapshotsList(snapshots = []) {
+  if (!projectSnapshotsListEl) return;
+  if (!snapshots.length) {
+    projectSnapshotsListEl.innerHTML = '<p class="muted">No snapshots yet. Use "Add Snapshot" first.</p>';
+    return;
+  }
+  projectSnapshotsListEl.innerHTML = snapshots.map((snapshot) => {
+    const stageText = snapshot.currentStage ? ` · ${escapeHTML(snapshot.currentStage)}` : '';
+    return `<div class="project-snapshot-item">
+      <div class="project-snapshot-meta">
+        <div class="project-snapshot-title">${escapeHTML(snapshot.label || 'Snapshot')}</div>
+        <div class="project-snapshot-subtitle">${escapeHTML(fmtDate(snapshot.createdAt))}${stageText}</div>
+      </div>
+      <button class="btn project-snapshot-restore-btn" data-snapshot-restore="${escapeHTML(snapshot.id)}">Restore</button>
+    </div>`;
+  }).join('');
+}
+
+function closeProjectSnapshotsModal() {
+  projectSnapshotsFolderName = null;
+  if (projectSnapshotsHintEl) projectSnapshotsHintEl.textContent = 'Select a saved snapshot to restore.';
+  if (projectSnapshotsErrorEl) projectSnapshotsErrorEl.textContent = '';
+  if (projectSnapshotsListEl) projectSnapshotsListEl.innerHTML = '<p class="muted">Loading snapshots...</p>';
+  closeModal('projectSnapshotsModal');
+}
+
+async function openProjectSnapshotsModal(folderName) {
+  projectSnapshotsFolderName = folderName;
+  const project = getProjectByFolder(folderName);
+  if (projectSnapshotsHintEl) {
+    const displayName = project?.projectName || folderName;
+    projectSnapshotsHintEl.textContent = `Select a saved snapshot for "${displayName}" to restore.`;
+  }
+  if (projectSnapshotsErrorEl) projectSnapshotsErrorEl.textContent = '';
+  if (projectSnapshotsListEl) projectSnapshotsListEl.innerHTML = '<p class="muted">Loading snapshots...</p>';
+  openModal('projectSnapshotsModal');
+
+  try {
+    const snapshots = await window.studioApi.listProjectSnapshots(folderName);
+    if (projectSnapshotsFolderName !== folderName) return;
+    renderProjectSnapshotsList(snapshots);
+  } catch (error) {
+    if (projectSnapshotsFolderName !== folderName) return;
+    if (projectSnapshotsErrorEl) projectSnapshotsErrorEl.textContent = error.message || 'Failed to load snapshots.';
+    renderProjectSnapshotsList([]);
+  }
+}
+
+async function createProjectSnapshotFromContext(folderName) {
+  const result = await window.studioApi.createProjectSnapshot(folderName);
+  if (state.currentFolderName === folderName) {
+    state.currentDoc = result.doc;
+  }
+  await loadProjects();
+  renderWorkspace();
+  if (result?.snapshot?.label) {
+    alert(`Snapshot saved: ${result.snapshot.label}`);
+  }
+  return result;
+}
+
+async function restoreProjectSnapshotFromModal(snapshotId) {
+  if (!projectSnapshotsFolderName || !snapshotId) return;
+  const confirmRestore = window.confirm('如果进行恢复，当前所有编辑的数据都会丢失，最好先 copy 一份再进行操作。\n\nIf you restore this snapshot, all current edits will be lost. It is best to copy the project first before continuing.\n\n是否继续恢复？');
+  if (!confirmRestore) return;
+
+  const result = await window.studioApi.restoreProjectSnapshot({
+    folderName: projectSnapshotsFolderName,
+    snapshotId,
+  });
+  closeProjectSnapshotsModal();
+
+  if (state.currentFolderName === result.folderName) {
+    clearProjectHistory();
+    state.currentDoc = result.doc;
+  }
+
+  await loadProjects();
+  renderWorkspace();
+  return result;
+}
+
 function promptProjectRename(defaultName = '') {
   return new Promise((resolve) => {
     pendingProjectRenameResolver = resolve;
@@ -1655,6 +1743,21 @@ projectRenameInputEl.addEventListener('keydown', (e) => {
 projectRenameModalEl.addEventListener('click', (e) => {
   if (e.target === projectRenameModalEl) cancelProjectRenameModal();
 });
+closeProjectSnapshotsBtnEl?.addEventListener('click', closeProjectSnapshotsModal);
+projectSnapshotsModalEl?.addEventListener('click', (e) => {
+  if (e.target === projectSnapshotsModalEl) closeProjectSnapshotsModal();
+});
+projectSnapshotsListEl?.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-snapshot-restore]');
+  if (!btn) return;
+  try {
+    await restoreProjectSnapshotFromModal(btn.dataset.snapshotRestore);
+  } catch (error) {
+    if (projectSnapshotsErrorEl) {
+      projectSnapshotsErrorEl.textContent = error.message || 'Snapshot restore failed.';
+    }
+  }
+});
 
 /* ── Reviewer Right-click Context Menu ── */
 const reviewerContextMenuEl = document.getElementById('reviewerContextMenu');
@@ -1735,6 +1838,10 @@ projectContextMenuEl.addEventListener('click', async (e) => {
       await renameProjectFromContext(folderName);
     } else if (action === 'copy') {
       await copyProjectFromContext(folderName);
+    } else if (action === 'snapshot-create') {
+      await createProjectSnapshotFromContext(folderName);
+    } else if (action === 'snapshot-restore') {
+      await openProjectSnapshotsModal(folderName);
     } else if (action === 'delete') {
       await deleteProjectFromContext(folderName);
     }
@@ -5369,6 +5476,10 @@ document.addEventListener('keydown', (e) => {
     const skillModalEl = document.getElementById('skillModal');
     if (skillModalEl && !skillModalEl.classList.contains('hidden')) {
       closeSkillModal();
+      return;
+    }
+    if (projectSnapshotsModalEl && !projectSnapshotsModalEl.classList.contains('hidden')) {
+      closeProjectSnapshotsModal();
       return;
     }
     hideStage2ContextMenu();
