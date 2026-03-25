@@ -312,15 +312,41 @@ async function loadStage5SampleTemplate() {
 }
 
 /* ── Docs panel state ── */
-const DOCS_FILES = [
-  { label: 'README', path: '../../documents/en/README.md' },
-  { label: 'Stage 1 — Breakdown', path: '../../documents/en/stage1-breakdown.md' },
-  { label: 'Stage 2 — Reply', path: '../../documents/en/stage2-reply.md' },
-  { label: 'Stage 3 — First Round', path: '../../documents/en/stage3-first-round.md' },
-  { label: 'Stage 4 — Multi Rounds', path: '../../documents/en/stage4-multi-rounds.md' },
-  { label: 'Stage 5 — Final Remarks', path: '../../documents/en/stage5-final-remarks.md' },
+const DOCS_ITEMS = [
+  {
+    id: 'readme',
+    labels: { en: 'README', ch: '总览' },
+    paths: { en: '../../documents/en/README.md', ch: '../../documents/ch/README.md' },
+  },
+  {
+    id: 'stage1',
+    labels: { en: 'Stage 1', ch: '阶段 1' },
+    paths: { en: '../../documents/en/stage1-breakdown.md', ch: '../../documents/ch/stage1-breakdown.md' },
+  },
+  {
+    id: 'stage2',
+    labels: { en: 'Stage 2', ch: '阶段 2' },
+    paths: { en: '../../documents/en/stage2-reply.md', ch: '../../documents/ch/stage2-reply.md' },
+  },
+  {
+    id: 'stage3',
+    labels: { en: 'Stage 3', ch: '阶段 3' },
+    paths: { en: '../../documents/en/stage3-first-round.md', ch: '../../documents/ch/stage3-first-round.md' },
+  },
+  {
+    id: 'stage4',
+    labels: { en: 'Stage 4', ch: '阶段 4' },
+    paths: { en: '../../documents/en/stage4-multi-rounds.md', ch: '../../documents/ch/stage4-multi-rounds.md' },
+  },
+  {
+    id: 'stage5',
+    labels: { en: 'Stage 5', ch: '阶段 5' },
+    paths: { en: '../../documents/en/stage5-final-remarks.md', ch: '../../documents/ch/stage5-final-remarks.md' },
+  },
 ];
-let docsCurrentPath = DOCS_FILES[0].path;
+const DOCS_STAGE_DOC_IDS = DOCS_ITEMS.map((item) => item.id);
+let docsCurrentLanguage = 'en';
+let docsCurrentDocId = DOCS_ITEMS[0].id;
 
 /* ── Skills catalog ── */
 const SKILLS_CATALOG = [
@@ -456,6 +482,9 @@ const conferenceSelect = document.getElementById('conferenceSelect');
 const reviewerInput = document.getElementById('reviewerInput');
 const autosaveInput = document.getElementById('autosaveInput');
 const settingsError = document.getElementById('settingsError');
+const docsTabListEl = document.getElementById('docsTabList');
+const docsLangEnBtnEl = document.getElementById('docsLangEnBtn');
+const docsLangZhBtnEl = document.getElementById('docsLangZhBtn');
 const projectSearchEl = document.getElementById('projectSearch');
 const searchProjectsToggleBtn = document.getElementById('searchProjectsToggleBtn');
 const projectSearchContainer = document.getElementById('projectSearchContainer');
@@ -1359,21 +1388,64 @@ async function deleteProjectFromContext(folderName) {
 /* ────────────────────────────────────────────────────────────
    Docs Panel
    ──────────────────────────────────────────────────────────── */
-async function renderDocsPanel(filePath) {
+function getDocsItemById(docId = docsCurrentDocId) {
+  return DOCS_ITEMS.find((item) => item.id === docId) || DOCS_ITEMS[0];
+}
+
+function getDocsPath(docId = docsCurrentDocId, language = docsCurrentLanguage) {
+  const item = getDocsItemById(docId);
+  return item?.paths?.[language] || item?.paths?.en || DOCS_ITEMS[0].paths.en;
+}
+
+function renderDocsTabs() {
+  if (!docsTabListEl) return;
+  docsTabListEl.innerHTML = DOCS_ITEMS.map((item) => {
+    const label = item.labels?.[docsCurrentLanguage] || item.labels?.en || item.id;
+    const active = item.id === docsCurrentDocId ? ' active' : '';
+    return `<button class="docs-tab-btn${active}" type="button" data-doc-id="${item.id}" aria-pressed="${item.id === docsCurrentDocId ? 'true' : 'false'}">${escapeHTML(label)}</button>`;
+  }).join('');
+}
+
+function renderDocsLanguageSwitch() {
+  [
+    { el: docsLangEnBtnEl, lang: 'en' },
+    { el: docsLangZhBtnEl, lang: 'ch' },
+  ].forEach(({ el, lang }) => {
+    if (!el) return;
+    const active = docsCurrentLanguage === lang;
+    el.classList.toggle('active', active);
+    el.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function applyDocsLanguage(language) {
+  const next = language === 'ch' ? 'ch' : 'en';
+  docsCurrentLanguage = next;
+  try {
+    localStorage.setItem('rebuttal-studio-docs-language', next);
+  } catch (_error) {
+    // ignore storage failures
+  }
+  renderDocsLanguageSwitch();
+  renderDocsTabs();
+}
+
+function loadDocsLanguage() {
+  try {
+    const saved = localStorage.getItem('rebuttal-studio-docs-language');
+    docsCurrentLanguage = saved === 'ch' ? 'ch' : 'en';
+  } catch (_error) {
+    docsCurrentLanguage = 'en';
+  }
+}
+
+async function renderDocsPanel(docId = docsCurrentDocId) {
   clearHomeIntroTimers();
   const docsPanelEl = document.getElementById('docsPanel');
   const docsContentEl = document.getElementById('docsContent');
-  const docsFileSelectEl = document.getElementById('docsFileSelect');
-
-  // Populate selector if first open
-  if (!docsFileSelectEl.options.length) {
-    docsFileSelectEl.innerHTML = DOCS_FILES.map((f) =>
-      `<option value="${f.path}">${f.label}</option>`
-    ).join('');
-  }
-
-  docsCurrentPath = filePath || docsCurrentPath;
-  docsFileSelectEl.value = docsCurrentPath;
+  docsCurrentDocId = getDocsItemById(docId).id;
+  renderDocsLanguageSwitch();
+  renderDocsTabs();
 
   // Show panel, hide others
   document.getElementById('emptyState').classList.add('hidden');
@@ -1384,7 +1456,7 @@ async function renderDocsPanel(filePath) {
   docsPanelEl.classList.remove('hidden');
 
   try {
-    const resp = await fetch(docsCurrentPath);
+    const resp = await fetch(getDocsPath(docsCurrentDocId, docsCurrentLanguage));
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const raw = await resp.text();
     docsContentEl.innerHTML = DOMPurify.sanitize(marked.parse(raw));
@@ -4738,6 +4810,7 @@ async function init() {
   document.documentElement.classList.add('platform-' + window.studioApi.getPlatform());
   if (homeFeedbackInputEl) homeFeedbackInputEl.value = '';
   loadTheme();
+  loadDocsLanguage();
   await loadTemplateLibrary();
   await loadStage3StyleLibrary();
   await loadStage5StyleLibrary();
@@ -4835,17 +4908,28 @@ document.querySelectorAll('.sort-popup-item').forEach(btn => {
 
 // Documentation buttons
 document.getElementById('openDocsExternalBtn')?.addEventListener('click', async () => {
-  const url = new URL('../../documents/en/README.md', window.location.href);
+  const url = new URL(getDocsPath('readme', docsCurrentLanguage), window.location.href);
   const absPath = decodeURIComponent(url.pathname);
   await window.studioApi.openPath(absPath);
 });
 
 document.getElementById('openDocsReaderBtn')?.addEventListener('click', () => {
-  renderDocsPanel(DOCS_FILES[0].path);
+  renderDocsPanel('readme');
 });
 
-document.getElementById('docsFileSelect')?.addEventListener('change', (e) => {
-  renderDocsPanel(e.target.value);
+docsTabListEl?.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-doc-id]');
+  if (!btn) return;
+  renderDocsPanel(btn.dataset.docId);
+});
+
+[docsLangEnBtnEl, docsLangZhBtnEl].forEach((btn) => {
+  btn?.addEventListener('click', () => {
+    const nextLang = btn.dataset.docsLang || 'en';
+    if (docsCurrentLanguage === nextLang) return;
+    applyDocsLanguage(nextLang);
+    renderDocsPanel(docsCurrentDocId);
+  });
 });
 
 document.getElementById('docsCloseBtn')?.addEventListener('click', () => {
@@ -4876,7 +4960,7 @@ homeFeedbackInputEl?.addEventListener('keydown', async (e) => {
 });
 
 document.getElementById('homeHowToBtn')?.addEventListener('click', () => {
-  renderDocsPanel(DOCS_FILES[0].path);
+  renderDocsPanel('readme');
 });
 
 document.getElementById('homeBehindBtn')?.addEventListener('click', () => {
@@ -4985,8 +5069,8 @@ sidebarStageListEl.addEventListener('click', (e) => {
   }
   if (docsBtn) {
     const docIdx = parseInt(docsBtn.dataset.docsOpen, 10);
-    if (DOCS_FILES[docIdx]) {
-      renderDocsPanel(DOCS_FILES[docIdx].path);
+    if (DOCS_STAGE_DOC_IDS[docIdx]) {
+      renderDocsPanel(DOCS_STAGE_DOC_IDS[docIdx]);
     }
     return;
   }

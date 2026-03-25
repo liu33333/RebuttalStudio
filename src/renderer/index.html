@@ -332,8 +332,15 @@
         <!-- Docs Reader Panel -->
         <div id="docsPanel" class="docs-panel hidden">
           <div class="docs-nav">
-            <select id="docsFileSelect" class="conference-select docs-file-select"></select>
-            <button id="docsCloseBtn" class="btn">✕ Close</button>
+            <div id="docsTabList" class="docs-tab-list" aria-label="Document tabs"></div>
+            <div class="docs-nav-actions">
+              <div class="docs-language-switch" aria-label="Switch document language">
+                <button id="docsLangEnBtn" class="docs-language-btn" type="button" data-docs-lang="en" aria-pressed="false">EN</button>
+                <span class="docs-language-divider" aria-hidden="true">|</span>
+                <button id="docsLangZhBtn" class="docs-language-btn" type="button" data-docs-lang="ch" aria-pressed="false">中</button>
+              </div>
+              <button id="docsCloseBtn" class="btn">✕ Close</button>
+            </div>
           </div>
           <div id="docsContent" class="docs-content markdown-body"></div>
         </div>
