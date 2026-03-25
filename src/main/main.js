@@ -32,6 +32,23 @@ const autosaveState = {
   debounceId: null,
 };
 
+const OPENAI_COMPATIBLE_PROVIDER_LABELS = {
+  openai: 'OpenAI',
+  deepseek: 'DeepSeek',
+  azureOpenai: 'Azure OpenAI',
+  qwen: 'Qwen',
+  custom: 'OpenAI-compatible provider',
+  openrouter: 'OpenRouter',
+  groq: 'Groq',
+  grok: 'xAI Grok',
+  together: 'Together AI',
+  kimi: 'Kimi',
+  minimax: 'MiniMax',
+  huggingface: 'Hugging Face',
+  portkey: 'Portkey',
+  bedrock: 'AWS Bedrock',
+};
+
 function clearAutosaveTimers() {
   if (autosaveState.intervalId) {
     clearInterval(autosaveState.intervalId);
@@ -90,6 +107,136 @@ function normalizeReviewerIdForFile(reviewerId = '') {
   const text = `${reviewerId || ''}`.trim() || 'reviewer';
   const safe = text.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
   return safe || 'reviewer';
+}
+
+function tryParseJson(text = '') {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function getOpenAICompatibleProviderLabel(providerKey = '', baseUrl = '') {
+  if (OPENAI_COMPATIBLE_PROVIDER_LABELS[providerKey]) {
+    return OPENAI_COMPATIBLE_PROVIDER_LABELS[providerKey];
+  }
+
+  const url = `${baseUrl || ''}`.toLowerCase();
+  if (url.includes('deepseek.com')) return 'DeepSeek';
+  if (url.includes('openrouter.ai')) return 'OpenRouter';
+  if (url.includes('groq.com')) return 'Groq';
+  if (url.includes('x.ai')) return 'xAI Grok';
+  if (url.includes('together.ai')) return 'Together AI';
+  if (url.includes('moonshot.cn')) return 'Kimi';
+  if (url.includes('minimax')) return 'MiniMax';
+  if (url.includes('huggingface.co')) return 'Hugging Face';
+  if (url.includes('portkey.ai')) return 'Portkey';
+  if (url.includes('amazonaws.com')) return 'AWS Bedrock';
+  if (url.includes('openai.com')) return 'OpenAI';
+
+  return 'OpenAI-compatible provider';
+}
+
+function formatOpenAICompatibleError({ providerKey = '', baseUrl = '', status = 0, detail = '', action = 'request' }) {
+  const providerLabel = getOpenAICompatibleProviderLabel(providerKey, baseUrl);
+  const parsed = tryParseJson(detail);
+  const message = `${parsed?.error?.message || parsed?.message || ''}`.trim();
+  const type = `${parsed?.error?.type || parsed?.type || ''}`.trim();
+  const code = `${parsed?.error?.code || parsed?.code || ''}`.trim();
+  const combined = [message, type, code].join(' ').toLowerCase();
+  const shortDetail = `${message || detail}`.replace(/\s+/g, ' ').trim().slice(0, 240);
+
+  if (status === 402 || combined.includes('insufficient balance')) {
+    const ownerLabel = providerLabel === 'OpenAI-compatible provider' ? 'provider' : providerLabel;
+    return `${providerLabel} API returned 402 Insufficient Balance. Your ${ownerLabel} account has no available credit or billing is not enabled. Please top up the account, enable billing, or switch to another API key/provider in API Settings.`;
+  }
+
+  if (status === 401 || combined.includes('unauthorized') || combined.includes('invalid api key')) {
+    return `${providerLabel} API returned 401 Unauthorized. Check that the API key is correct, active, and belongs to the selected provider.`;
+  }
+
+  if (status === 429 || combined.includes('rate limit') || combined.includes('quota')) {
+    return `${providerLabel} API returned 429 Too Many Requests. You hit a rate or quota limit. Wait and retry, reduce request frequency, or upgrade your quota.`;
+  }
+
+  if (status === 404 || combined.includes('model not found') || combined.includes('no such model')) {
+    return `${providerLabel} API returned 404 Not Found. Check that the Base URL and model name are correct for the selected provider.`;
+  }
+
+  if (status === 400 && combined.includes('response_format')) {
+    return `${providerLabel} API rejected the JSON response format requested by Rebuttal Studio. Try a model that supports JSON output, or switch to a provider/model known to support OpenAI-compatible JSON mode.`;
+  }
+
+  return `${providerLabel} ${action} failed (${status}): ${shortDetail || 'Unknown error.'}`;
+}
+
+function getJsonParseErrorPosition(error) {
+  const match = `${error?.message || ''}`.match(/position (\d+)/i);
+  return match ? Number(match[1]) : -1;
+}
+
+function previousNonWhitespaceIndex(text = '', index = 0) {
+  for (let i = index; i >= 0; i--) {
+    if (!/\s/.test(text[i])) return i;
+  }
+  return -1;
+}
+
+function nextNonWhitespaceIndex(text = '', index = 0) {
+  for (let i = index; i < text.length; i++) {
+    if (!/\s/.test(text[i])) return i;
+  }
+  return -1;
+}
+
+function isJsonValueTerminator(text = '', index = -1) {
+  if (index < 0 || index >= text.length) return false;
+  const ch = text[index];
+  if (ch === '}' || ch === ']' || ch === '"' || /\d/.test(ch)) return true;
+  const tail = text.slice(Math.max(0, index - 4), index + 1);
+  return /(true|false|null)$/.test(tail);
+}
+
+function isJsonValueStarter(text = '', index = -1) {
+  if (index < 0 || index >= text.length) return false;
+  const ch = text[index];
+  if (ch === '{' || ch === '[' || ch === '"' || ch === '-' || /\d/.test(ch)) return true;
+  return text.startsWith('true', index) || text.startsWith('false', index) || text.startsWith('null', index);
+}
+
+function repairJsonMissingCommaAtError(text = '', error) {
+  const pos = getJsonParseErrorPosition(error);
+  if (!Number.isFinite(pos) || pos <= 0 || pos >= text.length) {
+    return text;
+  }
+
+  const left = previousNonWhitespaceIndex(text, pos - 1);
+  const right = nextNonWhitespaceIndex(text, pos);
+  if (left < 0 || right < 0) {
+    return text;
+  }
+
+  if (!isJsonValueTerminator(text, left) || !isJsonValueStarter(text, right)) {
+    return text;
+  }
+
+  if (text.slice(left + 1, right).includes(',')) {
+    return text;
+  }
+
+  return `${text.slice(0, pos)},${text.slice(pos)}`;
+}
+
+function buildJsonErrorSnippet(text = '', error) {
+  const pos = getJsonParseErrorPosition(error);
+  if (!Number.isFinite(pos) || pos < 0) {
+    return text.slice(0, 160).replace(/\s+/g, ' ').trim();
+  }
+
+  const start = Math.max(0, pos - 80);
+  const end = Math.min(text.length, pos + 80);
+  return text.slice(start, end).replace(/\s+/g, ' ').trim();
 }
 
 async function saveCondensedMarkdown(reviewerId, condensedMarkdown, folderName = autosaveState.currentFolder) {
@@ -169,7 +316,13 @@ async function listProviderModels(providerKey, profile = {}) {
       });
       if (!res.ok) {
         const detail = await res.text();
-        throw new Error(`Failed to list models (${res.status}): ${detail.slice(0, 180)}`);
+        throw new Error(formatOpenAICompatibleError({
+          providerKey,
+          baseUrl,
+          status: res.status,
+          detail,
+          action: 'model listing',
+        }));
       }
       const data = await res.json();
       const names = (data.data || []).map((m) => m.id).filter(Boolean).sort();
@@ -773,9 +926,9 @@ async function runGeminiWritingAntiAI(profile = {}, content = '') {
   return { text: out };
 }
 
-async function runOpenAIWritingAntiAI(profile = {}, content = '') {
+async function runOpenAIWritingAntiAI(profile = {}, content = '', providerKey = '') {
   const prompt = buildWritingAntiAIPrompt(content);
-  const raw = await runOpenAICompatibleRequest(profile, prompt, 'application/json');
+  const raw = await runOpenAICompatibleRequest(profile, prompt, 'application/json', providerKey);
   const parsed = extractJsonFromText(raw);
   const out = `${parsed?.text ?? parsed?.draft ?? ''}`.trim();
   if (!out) throw new Error('Writing Anti-AI did not return text.');
@@ -843,7 +996,7 @@ async function runGeminiTemplateRephrase(profile = {}, content = '') {
   return { text: out, raw: parsed };
 }
 
-async function runOpenAICompatibleRequest(profile = {}, prompt = '', responseMimeType = 'text/plain') {
+async function runOpenAICompatibleRequest(profile = {}, prompt = '', responseMimeType = 'text/plain', providerKey = '') {
   const apiKey = (profile.apiKey || '').trim();
   const baseUrl = (profile.baseUrl || '').trim().replace(/\/$/, '') || 'https://api.openai.com/v1';
   const model = (profile.model || '').trim() || 'gpt-3.5-turbo';
@@ -875,7 +1028,12 @@ async function runOpenAICompatibleRequest(profile = {}, prompt = '', responseMim
 
   if (!res.ok) {
     const detail = await res.text();
-    throw new Error(`OpenAI-compatible request failed (${res.status}): ${detail.slice(0, 240)}`);
+    throw new Error(formatOpenAICompatibleError({
+      providerKey,
+      baseUrl,
+      status: res.status,
+      detail,
+    }));
   }
 
   const data = await res.json();
@@ -910,13 +1068,15 @@ function extractJsonFromText(text = '') {
       escaped = (c === '\\' && !escaped);
     }
 
-    // 2. Second pass: Fix missing commas between properties
+    // 2. Second pass: Fix missing commas between properties / array items on adjacent lines
     let lines = out.split('\n');
     for (let i = 0; i < lines.length - 1; i++) {
       const line = lines[i].trim();
       const next = lines[i + 1] ? lines[i + 1].trim() : '';
-      // If line ends with a probable value end and next line starts with a property name
-      if (line.match(/(?:"|\d|true|false|null|}|\])$/) && !line.endsWith(',') && next.startsWith('"')) {
+      const lineEndsWithValue = /(?:"|\d|true|false|null|}|\])$/.test(line);
+      const nextStartsWithValue = /^(?:"|\{|\[|-?\d|true\b|false\b|null\b)/.test(next);
+      const nextStartsWithCloser = /^[}\]]/.test(next);
+      if (lineEndsWithValue && !line.endsWith(',') && nextStartsWithValue && !nextStartsWithCloser) {
         lines[i] = lines[i] + ',';
       }
     }
@@ -931,13 +1091,24 @@ function extractJsonFromText(text = '') {
   function tryParse(candidate) {
     try {
       return JSON.parse(candidate);
-    } catch (e) {
-      try {
-        const repaired = tryRepair(candidate);
-        return JSON.parse(repaired);
-      } catch (e2) {
-        throw e;
+    } catch {
+      let current = tryRepair(candidate);
+      let lastError = null;
+
+      for (let attempt = 0; attempt < 8; attempt++) {
+        try {
+          return JSON.parse(current);
+        } catch (error) {
+          lastError = error;
+          const repairedAtError = repairJsonMissingCommaAtError(current, error);
+          if (repairedAtError === current) {
+            break;
+          }
+          current = repairedAtError;
+        }
       }
+
+      throw lastError || new Error('Unknown JSON parse failure.');
     }
   }
 
@@ -957,7 +1128,7 @@ function extractJsonFromText(text = '') {
       try {
         return tryParse(cleaned);
       } catch (e4) {
-        throw new Error(`JSON parse error: ${e4.message}. Body head: ${candidate.slice(0, 100).replace(/\n/g, ' ')}...`);
+        throw new Error(`JSON parse error: ${e4.message}. Around error: ${buildJsonErrorSnippet(cleaned, e4)}`);
       }
     }
   }
@@ -965,16 +1136,16 @@ function extractJsonFromText(text = '') {
   throw new Error(`No JSON object found in response. Body head: ${trimmed.slice(0, 100).replace(/\n/g, ' ')}...`);
 }
 
-async function runOpenAIStage1Breakdown(profile = {}, content = '', conference = 'ICLR') {
+async function runOpenAIStage1Breakdown(profile = {}, content = '', conference = 'ICLR', providerKey = '') {
   const prompt = buildStage1Prompt(content, conference);
-  const text = await runOpenAICompatibleRequest(profile, prompt, 'application/json');
+  const text = await runOpenAICompatibleRequest(profile, prompt, 'application/json', providerKey);
   const parsed = extractJsonFromText(text);
   return normalizeStage1Breakdown(parsed, conference);
 }
 
-async function runOpenAIStage2Refine(profile = {}, payload = {}, conference = 'ICLR') {
+async function runOpenAIStage2Refine(profile = {}, payload = {}, conference = 'ICLR', providerKey = '') {
   const prompt = buildStage2Prompt(payload, conference);
-  const text = await runOpenAICompatibleRequest(profile, prompt, 'application/json');
+  const text = await runOpenAICompatibleRequest(profile, prompt, 'application/json', providerKey);
   const parsed = extractJsonFromText(text);
 
   const draft = `${parsed?.draft ?? parsed?.response ?? ''}`.trim();
@@ -985,9 +1156,9 @@ async function runOpenAIStage2Refine(profile = {}, payload = {}, conference = 'I
   return { draft, raw: parsed };
 }
 
-async function runOpenAIStage4Condense(profile = {}, allSource = '') {
+async function runOpenAIStage4Condense(profile = {}, allSource = '', providerKey = '') {
   const prompt = buildStage4CondensePrompt(allSource);
-  const text = await runOpenAICompatibleRequest(profile, prompt, 'application/json');
+  const text = await runOpenAICompatibleRequest(profile, prompt, 'application/json', providerKey);
   const parsed = extractJsonFromText(text);
 
   const condensedMarkdown = `${parsed?.condensedMarkdown ?? parsed?.summary ?? ''}`.trim();
@@ -998,9 +1169,9 @@ async function runOpenAIStage4Condense(profile = {}, allSource = '') {
   return { condensedMarkdown, raw: parsed };
 }
 
-async function runOpenAIStage4Refine(profile = {}, payload = {}) {
+async function runOpenAIStage4Refine(profile = {}, payload = {}, providerKey = '') {
   const prompt = buildStage4RefinePrompt(payload);
-  const text = await runOpenAICompatibleRequest(profile, prompt, 'application/json');
+  const text = await runOpenAICompatibleRequest(profile, prompt, 'application/json', providerKey);
   const parsed = extractJsonFromText(text);
 
   const refinedText = `${parsed?.refinedText ?? parsed?.draft ?? parsed?.response ?? ''}`.trim();
@@ -1011,9 +1182,9 @@ async function runOpenAIStage4Refine(profile = {}, payload = {}) {
   return { refinedText, raw: parsed };
 }
 
-async function runOpenAIStage5FinalRemarks(profile = {}, payload = {}) {
+async function runOpenAIStage5FinalRemarks(profile = {}, payload = {}, providerKey = '') {
   const prompt = buildStage5FinalRemarksPrompt(payload);
-  const text = await runOpenAICompatibleRequest(profile, prompt, 'application/json');
+  const text = await runOpenAICompatibleRequest(profile, prompt, 'application/json', providerKey);
   const parsed = extractJsonFromText(text);
 
   const filledMarkdown = `${parsed?.filledMarkdown ?? parsed?.finalRemarks ?? parsed?.text ?? ''}`.trim();
@@ -1024,9 +1195,9 @@ async function runOpenAIStage5FinalRemarks(profile = {}, payload = {}) {
   return { filledMarkdown, raw: parsed };
 }
 
-async function runOpenAITemplateRephrase(profile = {}, content = '') {
+async function runOpenAITemplateRephrase(profile = {}, content = '', providerKey = '') {
   const prompt = buildTemplateRephrasePrompt(content);
-  const text = await runOpenAICompatibleRequest(profile, prompt, 'application/json');
+  const text = await runOpenAICompatibleRequest(profile, prompt, 'application/json', providerKey);
   const parsed = extractJsonFromText(text);
 
   const out = `${parsed?.text ?? parsed?.draft ?? ''}`.trim();
@@ -1117,7 +1288,7 @@ ipcMain.handle('app:stage1:breakdown', async (_event, payload) => {
   if (providerKey === 'gemini') {
     return runGeminiStage1Breakdown(profile, content, conference);
   } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom', 'openrouter', 'groq', 'grok', 'together', 'kimi', 'minimax', 'huggingface', 'portkey', 'bedrock'].includes(providerKey)) {
-    return runOpenAIStage1Breakdown(profile, content, conference);
+    return runOpenAIStage1Breakdown(profile, content, conference, providerKey);
   } else {
     throw new Error(`Stage1 breakdown does not support provider: ${providerKey}`);
   }
@@ -1140,7 +1311,7 @@ ipcMain.handle('app:stage2:refine', async (_event, payload) => {
   if (providerKey === 'gemini') {
     return runGeminiStage2Refine(profile, body, conference);
   } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom', 'openrouter', 'groq', 'grok', 'together', 'kimi', 'minimax', 'huggingface', 'portkey', 'bedrock'].includes(providerKey)) {
-    return runOpenAIStage2Refine(profile, body, conference);
+    return runOpenAIStage2Refine(profile, body, conference, providerKey);
   } else {
     throw new Error(`Stage2 refine does not support provider: ${providerKey}`);
   }
@@ -1154,7 +1325,7 @@ ipcMain.handle('app:stage4:condense', async (_event, payload) => {
   if (providerKey === 'gemini') {
     return runGeminiStage4Condense(profile, allSource);
   } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom', 'openrouter', 'groq', 'grok', 'together', 'kimi', 'minimax', 'huggingface', 'portkey', 'bedrock'].includes(providerKey)) {
-    return runOpenAIStage4Condense(profile, allSource);
+    return runOpenAIStage4Condense(profile, allSource, providerKey);
   } else {
     throw new Error(`Stage4 condense does not support provider: ${providerKey}`);
   }
@@ -1181,7 +1352,7 @@ ipcMain.handle('app:stage4:refine', async (_event, payload) => {
   if (providerKey === 'gemini') {
     return runGeminiStage4Refine(profile, body);
   } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom', 'openrouter', 'groq', 'grok', 'together', 'kimi', 'minimax', 'huggingface', 'portkey', 'bedrock'].includes(providerKey)) {
-    return runOpenAIStage4Refine(profile, body);
+    return runOpenAIStage4Refine(profile, body, providerKey);
   } else {
     throw new Error(`Stage4 refine does not support provider: ${providerKey}`);
   }
@@ -1210,7 +1381,7 @@ ipcMain.handle('app:stage5:finalize', async (_event, payload) => {
     return runOpenAIStage5FinalRemarks(profile, {
       templateSource,
       reviewerSummaries,
-    });
+    }, providerKey);
   } else {
     throw new Error(`Stage5 final remarks does not support provider: ${providerKey}`);
   }
@@ -1225,7 +1396,7 @@ ipcMain.handle('app:template:rephrase', async (_event, payload) => {
   if (providerKey === 'gemini') {
     return runGeminiTemplateRephrase(profile, content);
   } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom', 'openrouter', 'groq', 'grok', 'together', 'kimi', 'minimax', 'huggingface', 'portkey', 'bedrock'].includes(providerKey)) {
-    return runOpenAITemplateRephrase(profile, content);
+    return runOpenAITemplateRephrase(profile, content, providerKey);
   } else {
     throw new Error(`Template AI polish does not support provider: ${providerKey}`);
   }
@@ -1239,7 +1410,7 @@ ipcMain.handle('app:text:antiAI', async (_event, payload) => {
   if (providerKey === 'gemini') {
     return runGeminiWritingAntiAI(profile, content);
   } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom', 'openrouter', 'groq', 'grok', 'together', 'kimi', 'minimax', 'huggingface', 'portkey', 'bedrock'].includes(providerKey)) {
-    return runOpenAIWritingAntiAI(profile, content);
+    return runOpenAIWritingAntiAI(profile, content, providerKey);
   } else {
     throw new Error(`Writing Anti-AI does not support provider: ${providerKey}`);
   }

@@ -562,7 +562,7 @@ const API_PROVIDER_GUIDE = {
   deepseek: {
     baseUrl: 'https://api.deepseek.com/v1',
     model: 'deepseek-chat',
-    baseUrlHelp: 'Use the official DeepSeek endpoint unless your provider gave a custom URL.',
+    baseUrlHelp: 'Use the official DeepSeek endpoint unless your provider gave a custom URL. If you see a 402 error, your DeepSeek billing/credit is unavailable.',
   },
   azureOpenai: {
     baseUrl: '',
