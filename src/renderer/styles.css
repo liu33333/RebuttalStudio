@@ -2432,6 +2432,32 @@ html.platform-win32:not([data-theme]) .sidebar {
   flex-shrink: 0;
 }
 
+.api-key-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.api-key-row .text-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.api-visibility-btn {
+  width: 42px;
+  min-width: 42px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.api-visibility-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
 .model-select.hidden,
 .model-input-row .text-input.hidden {
   display: none !important;

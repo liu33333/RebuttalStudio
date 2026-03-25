@@ -633,6 +633,7 @@ const apiProviderSelectEl = document.getElementById('apiProviderSelect');
 const apiBaseUrlInputEl = document.getElementById('apiBaseUrlInput');
 const apiModelInputEl = document.getElementById('apiModelInput');
 const apiInputEl = document.getElementById('apiInput');
+const apiToggleVisibilityBtnEl = document.getElementById('apiToggleVisibilityBtn');
 const apiSettingsErrorEl = document.getElementById('apiSettingsError');
 const apiBaseUrlHelpEl = document.getElementById('apiBaseUrlHelp');
 const apiModelHintEl = document.getElementById('apiModelHint');
@@ -4627,6 +4628,35 @@ function getActiveApiProfile(providerKey = state.apiSettings.activeApiProvider) 
   return state.apiSettings.apiProfiles[providerKey];
 }
 
+function getApiVisibilityIconMarkup(visible) {
+  if (visible) {
+    return `
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M3 3l18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+        <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M9.9 5.2A11.4 11.4 0 0 1 12 5c6.7 0 10.5 7 10.5 7a18.5 18.5 0 0 1-4 4.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M6.3 6.3A18.2 18.2 0 0 0 1.5 12s3.8 7 10.5 7a11.8 11.8 0 0 0 5.1-1.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    `;
+  }
+  return `
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M1.5 12s3.8-7 10.5-7 10.5 7 10.5 7-3.8 7-10.5 7S1.5 12 1.5 12Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+      <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8" />
+    </svg>
+  `;
+}
+
+function setApiKeyVisibility(visible) {
+  if (!apiInputEl || !apiToggleVisibilityBtnEl) return;
+  const isVisible = Boolean(visible);
+  apiInputEl.type = isVisible ? 'text' : 'password';
+  apiToggleVisibilityBtnEl.innerHTML = getApiVisibilityIconMarkup(isVisible);
+  apiToggleVisibilityBtnEl.setAttribute('aria-pressed', String(isVisible));
+  apiToggleVisibilityBtnEl.setAttribute('aria-label', isVisible ? 'Hide API key' : 'Show API key');
+  apiToggleVisibilityBtnEl.title = isVisible ? 'Hide API key' : 'Show API key';
+}
+
 function isLocalModelProfile(profile = {}) {
   const baseUrl = `${profile.baseUrl || ''}`.trim();
   if (!baseUrl) return false;
@@ -4674,6 +4704,7 @@ function renderApiForm(providerKey = state.apiSettings.activeApiProvider) {
   apiBaseUrlInputEl.value = profile?.baseUrl ?? guide.baseUrl ?? '';
   apiModelInputEl.value = profile?.model ?? guide.model ?? '';
   apiInputEl.value = profile?.apiKey ?? '';
+  setApiKeyVisibility(false);
   // Reset model selector to text input mode
   apiModelSelectEl.classList.add('hidden');
   apiModelInputEl.classList.remove('hidden');
@@ -5836,6 +5867,9 @@ ${rawCode}
 document.getElementById('apiOpenBtn').addEventListener('click', openApiSettingsModal);
 document.getElementById('cancelApiBtn').addEventListener('click', () => closeModal('apiModal'));
 document.getElementById('saveApiBtn').addEventListener('click', saveApiSettings);
+apiToggleVisibilityBtnEl?.addEventListener('click', () => {
+  setApiKeyVisibility(apiInputEl?.type !== 'text');
+});
 apiProviderSelectEl.addEventListener('change', (e) => {
   renderApiForm(e.target.value);
   apiSettingsErrorEl.textContent = '';
