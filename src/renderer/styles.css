@@ -2204,6 +2204,46 @@ html.platform-win32:not([data-theme]) .sidebar {
   margin-bottom: var(--space-1);
 }
 
+.api-error-modal {
+  width: min(760px, 94vw);
+}
+
+.api-error-summary {
+  margin: 0;
+  color: var(--text);
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.api-error-report-wrap {
+  display: grid;
+  gap: 8px;
+}
+
+.api-error-report-wrap label {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.api-error-report {
+  width: 100%;
+  min-height: 280px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+  color: var(--text);
+  padding: 12px;
+  resize: vertical;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.api-error-actions {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
 .modal h3 {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 0.9rem;

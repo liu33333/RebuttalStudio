@@ -432,6 +432,24 @@
     </div>
   </div>
 
+  <!-- API Error Modal -->
+  <div id="apiErrorModal" class="modal-backdrop hidden">
+    <div class="modal api-error-modal" role="dialog" aria-modal="true" aria-labelledby="apiErrorTitle">
+      <h3 id="apiErrorTitle">API Error</h3>
+      <p id="apiErrorSummary" class="api-error-summary">The API request failed.</p>
+      <p class="muted">You can review the full error report or open a pre-filled GitHub issue.</p>
+      <div id="apiErrorReportWrap" class="api-error-report-wrap hidden">
+        <label for="apiErrorReport">Full Error Report</label>
+        <textarea id="apiErrorReport" class="api-error-report" readonly spellcheck="false"></textarea>
+      </div>
+      <div class="modal-actions api-error-actions">
+        <button id="apiErrorViewBtn" class="btn" type="button">View Full Error</button>
+        <button id="apiErrorReportBtn" class="btn" type="button">Report This Error</button>
+        <button id="apiErrorOkBtn" class="btn primary" type="button">OK</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Settings Modal -->
   <div id="settingsModal" class="modal-backdrop hidden">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">

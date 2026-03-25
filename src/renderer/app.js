@@ -386,6 +386,8 @@ const SKILLS_CATALOG = [
 ];
 
 const GITHUB_PR_URL = 'https://github.com/runtsang/RebuttalStudio/pulls';
+const GITHUB_ISSUES_NEW_URL = 'https://github.com/runtsang/RebuttalStudio/issues/new';
+const GITHUB_ISSUE_BODY_LIMIT = 7000;
 
 /* ────────────────────────────────────────────────────────────
    State
@@ -425,6 +427,7 @@ let stage4RefineRuntime = { running: false, reviewerIdx: -1 };
 let stage5AutoFillRuntime = { running: false };
 let stage2OutlineContext = { responseId: null, x: 0, y: 0 };
 let stage3SourceContext = { responseId: null, x: 0, y: 0, start: 0, end: 0 };
+let apiErrorModalState = { expanded: false, issueUrl: '', report: '' };
 
 // Writing Anti-AI context menu state
 const antiAIState = {
@@ -637,6 +640,13 @@ const apiModelSelectEl = document.getElementById('apiModelSelect');
 const detectModelsBtnEl = document.getElementById('detectModelsBtn');
 const activeModelBadgeEl = document.getElementById('activeModelBadge');
 const tokenUsageBadgeEl = document.getElementById('tokenUsageBadge');
+const apiErrorModalEl = document.getElementById('apiErrorModal');
+const apiErrorSummaryEl = document.getElementById('apiErrorSummary');
+const apiErrorReportWrapEl = document.getElementById('apiErrorReportWrap');
+const apiErrorReportEl = document.getElementById('apiErrorReport');
+const apiErrorViewBtnEl = document.getElementById('apiErrorViewBtn');
+const apiErrorReportBtnEl = document.getElementById('apiErrorReportBtn');
+const apiErrorOkBtnEl = document.getElementById('apiErrorOkBtn');
 
 // Stage advance modal
 const stageAdvanceModalEl = document.getElementById('stageAdvanceModal');
@@ -1634,20 +1644,161 @@ function runRebuttalTypoLoop(attemptIdx = 0) {
   });
 }
 
+function getPlatformLabel() {
+  const platformMap = { darwin: 'macOS', win32: 'Windows', linux: 'Linux' };
+  const rawPlatform = window.studioApi?.getPlatform?.() ?? 'unknown';
+  return platformMap[rawPlatform] ?? rawPlatform;
+}
+
+function buildGitHubIssueUrl(title, body) {
+  const issueUrl = new URL(GITHUB_ISSUES_NEW_URL);
+  issueUrl.searchParams.set('title', title);
+  issueUrl.searchParams.set('body', body);
+  return issueUrl.toString();
+}
+
+function truncateGitHubIssueText(text = '', limit = GITHUB_ISSUE_BODY_LIMIT) {
+  if (`${text}`.length <= limit) return `${text}`;
+  return `${`${text}`.slice(0, limit)}\n\n[Truncated before opening GitHub to keep the issue URL within a safe length. Please paste any extra details manually if needed.]`;
+}
+
+function normalizeRemoteErrorMessage(message = '') {
+  const raw = `${message || ''}`.trim();
+  const cleaned = raw
+    .replace(/^Error invoking remote method '[^']+':\s*/i, '')
+    .replace(/^Error:\s*/i, '')
+    .trim();
+  return cleaned || raw || 'Unknown error.';
+}
+
+function extractErrorMessage(error) {
+  if (typeof error === 'string') return normalizeRemoteErrorMessage(error);
+  return normalizeRemoteErrorMessage(error?.message || '');
+}
+
+function extractErrorReportText(error) {
+  if (typeof error === 'string') return `${error}`;
+  if (error?.stack) return `${error.stack}`;
+  if (error?.message) return `${error.message}`;
+  try {
+    return JSON.stringify(error, null, 2);
+  } catch {
+    return `${error || 'Unknown error.'}`;
+  }
+}
+
+function getStageDisplayName(stageKey = '') {
+  const wanted = `${stageKey || ''}`.trim();
+  if (!wanted) return 'Unknown';
+  const match = STAGES.find((item) => item.key === wanted);
+  return match?.label || wanted;
+}
+
 function buildFeedbackIssueUrl(rawFeedback = '') {
   const cleaned = `${rawFeedback}`.trim();
   const compact = cleaned.replace(/\s+/g, ' ');
   const titleCore = compact ? compact.slice(0, 72) : 'Feedback about Rebuttal Studio';
   const title = `[Feedback] ${titleCore}`;
   const description = cleaned || '(No additional description provided.)';
-  const platformMap = { darwin: 'macOS', win32: 'Windows', linux: 'Linux' };
-  const rawPlatform = window.studioApi?.getPlatform?.() ?? 'unknown';
-  const os = platformMap[rawPlatform] ?? rawPlatform;
+  const os = getPlatformLabel();
   const body = `## DESCRIPTION\n${description}\n\n## ENVIRONMENT\nOS: ${os}\n\n## SOURCE\nSubmitted from Rebuttal Studio home feedback box.`;
-  const issueUrl = new URL('https://github.com/runtsang/RebuttalStudio/issues/new');
-  issueUrl.searchParams.set('title', title);
-  issueUrl.searchParams.set('body', body);
-  return issueUrl.toString();
+  return buildGitHubIssueUrl(title, body);
+}
+
+function buildApiErrorReport(error, context = {}) {
+  const providerKey = `${context.providerKey || state.apiSettings.activeApiProvider || ''}`.trim();
+  const profile = context.profile || getActiveApiProfile(providerKey) || {};
+  const stageKey = `${context.stageKey || currentStageKey() || ''}`.trim();
+  const stageLabel = context.stageLabel || getStageDisplayName(stageKey);
+  const actionLabel = context.actionLabel || stageLabel || 'API request';
+  const reviewer = state.reviewers[state.activeReviewerIdx];
+  const reviewerLabel = reviewer?.name ? `${reviewer.name}` : (state.reviewers.length ? `Reviewer ${state.activeReviewerIdx + 1}` : 'Unknown');
+  const timestamp = new Date().toISOString();
+  const message = extractErrorMessage(error);
+  const fullError = `${extractErrorReportText(error) || message}`.trim();
+  const os = getPlatformLabel();
+  const report = [
+    `Timestamp: ${timestamp}`,
+    `Action: ${actionLabel}`,
+    `Stage: ${stageLabel}`,
+    `Conference: ${state.currentDoc?.conference || '(Unknown)'}`,
+    `Provider: ${providerKey || '(Unknown)'}`,
+    `Model: ${profile?.model || '(Unknown)'}`,
+    `Base URL: ${`${profile?.baseUrl || ''}`.trim() || '(Default)'}`,
+    `OS: ${os}`,
+    '',
+    'Error Message:',
+    message,
+    '',
+    'Full Error:',
+    fullError,
+  ].join('\n');
+  const compactMessage = message.replace(/\s+/g, ' ').trim();
+  const titleCore = compactMessage || `${actionLabel} failed`;
+  const issueTitle = `[Bug] ${actionLabel}: ${titleCore.slice(0, 84)}`;
+  const issueBody = [
+    '## Summary',
+    `Action: ${actionLabel}`,
+    `Stage: ${stageLabel}`,
+    `Conference: ${state.currentDoc?.conference || '(Unknown)'}`,
+    `Provider: ${providerKey || '(Unknown)'}`,
+    `Model: ${profile?.model || '(Unknown)'}`,
+    `Base URL: ${`${profile?.baseUrl || ''}`.trim() || '(Default)'}`,
+    `OS: ${os}`,
+    `Time: ${timestamp}`,
+    '',
+    '## Error Message',
+    message,
+    '',
+    '## Full Error Report',
+    '```text',
+    truncateGitHubIssueText(report),
+    '```',
+  ].join('\n');
+
+  return {
+    summary: `${actionLabel} failed.\n${message}`,
+    report,
+    issueUrl: buildGitHubIssueUrl(issueTitle, issueBody),
+  };
+}
+
+function setApiErrorDetailsVisible(visible) {
+  apiErrorModalState.expanded = Boolean(visible);
+  apiErrorReportWrapEl?.classList.toggle('hidden', !apiErrorModalState.expanded);
+  if (apiErrorViewBtnEl) {
+    apiErrorViewBtnEl.textContent = apiErrorModalState.expanded ? 'Hide Full Error' : 'View Full Error';
+  }
+}
+
+function closeApiErrorModal() {
+  apiErrorModalState = { expanded: false, issueUrl: '', report: '' };
+  if (apiErrorSummaryEl) apiErrorSummaryEl.textContent = '';
+  if (apiErrorReportEl) apiErrorReportEl.value = '';
+  setApiErrorDetailsVisible(false);
+  closeModal('apiErrorModal');
+}
+
+async function reportApiError() {
+  if (!apiErrorModalState.issueUrl) return;
+  await window.studioApi.openExternal(apiErrorModalState.issueUrl);
+}
+
+function showApiErrorModal(error, context = {}) {
+  const message = extractErrorMessage(error);
+  if (!apiErrorModalEl || !apiErrorSummaryEl || !apiErrorReportEl) {
+    alert(message);
+    return;
+  }
+
+  const payload = buildApiErrorReport(error, context);
+  apiErrorSummaryEl.textContent = payload.summary;
+  apiErrorReportEl.value = payload.report;
+  apiErrorReportBtnEl.disabled = !payload.issueUrl;
+  apiErrorModalState.issueUrl = payload.issueUrl;
+  apiErrorModalState.report = payload.report;
+  setApiErrorDetailsVisible(false);
+  openModal('apiErrorModal');
 }
 
 function renderHomeLanding() {
@@ -2771,7 +2922,7 @@ async function runStage4RefinePipeline() {
     queueStateSync();
     renderStage4Panels();
     stage4RefineRuntime = { running: false, reviewerIdx: -1 };
-    alert(error.message || 'Stage4 Step1 failed.');
+    showApiErrorModal(error, { actionLabel: 'Stage4 Step 1 Condense', stageKey: 'stage4' });
     return;
   }
 
@@ -2788,7 +2939,7 @@ async function runStage4RefinePipeline() {
     setProgress('step2', 'error');
     queueStateSync();
     renderStage4Panels();
-    alert(error.message || 'Stage4 Step2 failed.');
+    showApiErrorModal(error, { actionLabel: 'Stage4 Step 2 Refine', stageKey: 'stage4' });
   } finally {
     stage4RefineRuntime = { running: false, reviewerIdx: -1 };
     convertBtnEl.disabled = false;
@@ -3113,7 +3264,7 @@ async function runStage5AutoFillPipeline() {
     stage5AutoFillRuntime = { running: false };
     stage2AutoFitBtn.disabled = false;
     stage2AutoFitBtn.classList.remove('loading');
-    alert(error.message || 'Stage5 step1 failed.');
+    showApiErrorModal(error, { actionLabel: 'Stage5 Step 1 Condense', stageKey: 'stage5' });
     return;
   }
 
@@ -3131,7 +3282,7 @@ async function runStage5AutoFillPipeline() {
     setStage5Progress('step2', 'error', error.message || 'Stage5 step2 failed.');
     queueStateSync();
     renderStage5Panels();
-    alert(error.message || 'Stage5 step2 failed.');
+    showApiErrorModal(error, { actionLabel: 'Stage5 Step 2 Final Remarks', stageKey: 'stage5' });
   } finally {
     stage5AutoFillRuntime = { running: false };
     stage2AutoFitBtn.disabled = false;
@@ -4146,7 +4297,7 @@ async function runStage2RefineOneResponse(responseId) {
     renderSidebarStages();
   } catch (error) {
     console.error(error);
-    alert(error.message || 'Failed to run Stage2 refine API.');
+    showApiErrorModal(error, { actionLabel: 'Stage2 Refine', stageKey: 'stage2', providerKey, profile });
   } finally {
     stage2RefineProgress = null;
     convertBtnEl.disabled = false;
@@ -4213,7 +4364,7 @@ async function runStage2RefineForResponses() {
     renderSidebarStages();
   } catch (error) {
     console.error(error);
-    alert(error.message || 'Failed to run Stage2 refine API.');
+    showApiErrorModal(error, { actionLabel: 'Stage2 Refine', stageKey: 'stage2', providerKey, profile });
   } finally {
     stage2RefineProgress = null;
     convertBtnEl.disabled = false;
@@ -4248,7 +4399,7 @@ async function performBreakdown() {
     data.responses = Array.isArray(result?.responses) ? result.responses : [];
   } catch (error) {
     console.error(error);
-    alert(error.message || 'Failed to run Stage1 breakdown API.');
+    showApiErrorModal(error, { actionLabel: 'Stage1 Breakdown', stageKey: 'stage1' });
   } finally {
     convertBtnEl.disabled = false;
     convertBtnEl.classList.remove('loading');
@@ -4990,6 +5141,17 @@ document.getElementById('skillModalCloseBtn')?.addEventListener('click', closeSk
 // Skill modal backdrop click to close
 document.getElementById('skillModal')?.addEventListener('click', (e) => {
   if (e.target === document.getElementById('skillModal')) closeSkillModal();
+});
+
+apiErrorOkBtnEl?.addEventListener('click', closeApiErrorModal);
+apiErrorViewBtnEl?.addEventListener('click', () => {
+  setApiErrorDetailsVisible(!apiErrorModalState.expanded);
+});
+apiErrorReportBtnEl?.addEventListener('click', async () => {
+  await reportApiError();
+});
+apiErrorModalEl?.addEventListener('click', (e) => {
+  if (e.target === apiErrorModalEl) closeApiErrorModal();
 });
 
 document.getElementById('brandBtn').addEventListener('click', () => {
