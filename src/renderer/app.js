@@ -367,7 +367,7 @@ const SKILLS_CATALOG = [
   {
     stage: 'Stage 4 — Multi Rounds',
     skills: [
-      { label: 'Condense', icon: '🗜️', path: '../../skills/stage4/condense/SKILL.md' },
+      { label: 'Condense', icon: '≡', path: '../../skills/stage4/condense/SKILL.md' },
       { label: 'Refine', icon: '🪄', path: '../../skills/stage4/refine/SKILL.md' },
     ],
   },
@@ -381,9 +381,34 @@ const SKILLS_CATALOG = [
     stage: 'Utility',
     skills: [
       { label: 'Polish', icon: '✨', path: '../../skills/polish/SKILL.md' },
+      { label: 'Writing Anti-AI', icon: '✦', path: '../../skills/utility/stage/writing-anti-ai/SKILL.md' },
+      { label: 'Condense', icon: '≡', path: '../../skills/utility/stage/text-condense/SKILL.md' },
     ],
   },
 ];
+
+const CONDENSE_SYMBOL = '≡';
+
+const TEXT_ACTIONS = Object.freeze({
+  antiAI: {
+    icon: '✦',
+    label: 'Writing Anti-AI',
+    loadingLabel: 'Removing AI patterns...',
+    successLabel: 'Writing Anti-AI applied',
+    emptyResponseLabel: 'Empty response from Writing Anti-AI.',
+    errorLabel: 'Writing Anti-AI failed.',
+    run: (payload) => window.studioApi.runWritingAntiAI(payload),
+  },
+  condense: {
+    icon: CONDENSE_SYMBOL,
+    label: 'Condense',
+    loadingLabel: 'Condensing text...',
+    successLabel: 'Condense applied',
+    emptyResponseLabel: 'Empty response from Condense.',
+    errorLabel: 'Condense failed.',
+    run: (payload) => window.studioApi.runTextCondense(payload),
+  },
+});
 
 const GITHUB_PR_URL = 'https://github.com/runtsang/RebuttalStudio/pulls';
 const GITHUB_ISSUES_NEW_URL = 'https://github.com/runtsang/RebuttalStudio/issues/new';
@@ -432,8 +457,8 @@ let stage2OutlineContext = { responseId: null, x: 0, y: 0 };
 let stage3SourceContext = { responseId: null, x: 0, y: 0, start: 0, end: 0 };
 let apiErrorModalState = { expanded: false, issueUrl: '', report: '' };
 
-// Writing Anti-AI context menu state
-const antiAIState = {
+// Selected-text action context menu state
+const textActionState = {
   element: null,
   type: null,          // 'textarea' | 'contenteditable'
   selectedText: '',
@@ -880,12 +905,31 @@ function buildProjectDocFromState() {
   });
 }
 
+function buildProjectHistoryComparableDoc(doc) {
+  const comparable = deepCloneJson(doc || {});
+
+  Object.values(comparable.stage3Drafts || {}).forEach((draftMap) => {
+    Object.values(draftMap || {}).forEach((draft) => {
+      if (!draft || typeof draft !== 'object') return;
+      delete draft.renderedHtml;
+      delete draft.renderedThemeColor;
+    });
+  });
+
+  if (comparable.stage5Data && typeof comparable.stage5Data === 'object') {
+    delete comparable.stage5Data.renderedHtml;
+    delete comparable.stage5Data.previewMode;
+  }
+
+  return comparable;
+}
+
 function makeProjectHistoryEntry(doc = buildProjectDocFromState()) {
   if (!doc) return null;
   const snapshot = deepCloneJson(doc);
   return {
     snapshot,
-    signature: JSON.stringify(snapshot),
+    signature: JSON.stringify(buildProjectHistoryComparableDoc(snapshot)),
   };
 }
 
@@ -985,6 +1029,7 @@ function commitProjectHistorySnapshot() {
     return;
   }
   if (nextEntry.signature === projectHistoryState.present.signature) {
+    projectHistoryState.present = nextEntry;
     if (projectHistoryState.typing) {
       projectHistoryState.typing.latest = nextEntry;
       clearProjectHistoryTypingTimer();
@@ -1037,8 +1082,8 @@ function restoreProjectHistoryEntry(entry) {
   hideCopyPopup();
   hideStage2ContextMenu();
   hideStage3SourceMenu();
-  hideAntiAIMenu();
-  hideAntiAIToast();
+  hideTextActionsMenu();
+  hideTextActionToast();
   closeStage5TemplateModal();
   stage4RefineRuntime = { running: false, reviewerIdx: -1 };
   stage5AutoFillRuntime = { running: false };
@@ -2666,6 +2711,7 @@ function ensureStage3SourceMenu() {
     <button class="stage2-outline-menu-item" data-stage3-format="h2">Small Heading</button>
     <div class="stage2-outline-menu-divider"></div>
     <button class="stage2-outline-menu-item" data-stage3-format="anti-ai">✦ Anti-AI</button>
+    <button class="stage2-outline-menu-item" data-stage3-format="condense">${CONDENSE_SYMBOL} Condense</button>
   `;
   document.body.appendChild(menu);
   return menu;
@@ -2678,106 +2724,131 @@ function hideStage3SourceMenu() {
 }
 
 /* ──────────────────────────────────────────────────────────────
-   Writing Anti-AI — context menu, toast, and replacement logic
+   Selected text actions — context menu, toast, and replacement logic
    ────────────────────────────────────────────────────────────── */
 
-function ensureAntiAIMenu() {
-  let menu = document.getElementById('writingAntiAIMenu');
+function getTextActionMeta(actionKey) {
+  return TEXT_ACTIONS[actionKey] || TEXT_ACTIONS.antiAI;
+}
+
+function resetTextActionState() {
+  textActionState.element = null;
+  textActionState.type = null;
+  textActionState.selectedText = '';
+  textActionState.selStart = 0;
+  textActionState.selEnd = 0;
+  textActionState.savedRange = null;
+  textActionState.originalValue = '';
+}
+
+function ensureTextActionsMenu() {
+  let menu = document.getElementById('textActionsMenu');
   if (menu) return menu;
   menu = document.createElement('div');
-  menu.id = 'writingAntiAIMenu';
-  menu.className = 'writing-anti-ai-menu hidden';
+  menu.id = 'textActionsMenu';
+  menu.className = 'text-actions-menu hidden';
   menu.innerHTML = `
-    <button class="writing-anti-ai-menu-item" id="writingAntiAIBtn">
-      <span class="writing-anti-ai-btn-label">✦ Writing Anti-AI</span>
+    <button class="text-actions-menu-item" id="textActionAntiAIBtn">
+      <span>✦ Writing Anti-AI</span>
+    </button>
+    <button class="text-actions-menu-item" id="textActionCondenseBtn">
+      <span>${CONDENSE_SYMBOL} Condense</span>
     </button>
   `;
   document.body.appendChild(menu);
-  menu.querySelector('#writingAntiAIBtn').addEventListener('click', () => {
-    hideAntiAIMenu();
-    runAntiAIReplacement();
+  menu.querySelector('#textActionAntiAIBtn').addEventListener('click', () => {
+    hideTextActionsMenu();
+    runSelectedTextAction('antiAI');
+  });
+  menu.querySelector('#textActionCondenseBtn').addEventListener('click', () => {
+    hideTextActionsMenu();
+    runSelectedTextAction('condense');
   });
   return menu;
 }
 
-function hideAntiAIMenu() {
-  const menu = document.getElementById('writingAntiAIMenu');
+function hideTextActionsMenu() {
+  const menu = document.getElementById('textActionsMenu');
   if (menu) menu.classList.add('hidden');
 }
 
-function showAntiAIMenu(e, editableEl) {
+function showTextActionsMenu(e, editableEl) {
   if (editableEl.tagName === 'TEXTAREA') {
     if (editableEl.selectionStart === editableEl.selectionEnd) return;
-    antiAIState.element = editableEl;
-    antiAIState.type = 'textarea';
-    antiAIState.selectedText = editableEl.value.substring(editableEl.selectionStart, editableEl.selectionEnd);
-    antiAIState.selStart = editableEl.selectionStart;
-    antiAIState.selEnd = editableEl.selectionEnd;
-    antiAIState.originalValue = editableEl.value;
-    antiAIState.savedRange = null;
+    textActionState.element = editableEl;
+    textActionState.type = 'textarea';
+    textActionState.selectedText = editableEl.value.substring(editableEl.selectionStart, editableEl.selectionEnd);
+    textActionState.selStart = editableEl.selectionStart;
+    textActionState.selEnd = editableEl.selectionEnd;
+    textActionState.originalValue = editableEl.value;
+    textActionState.savedRange = null;
   } else {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed) return;
-    antiAIState.element = editableEl;
-    antiAIState.type = 'contenteditable';
-    antiAIState.selectedText = sel.toString();
-    antiAIState.selStart = 0;
-    antiAIState.selEnd = 0;
-    antiAIState.savedRange = sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
-    antiAIState.originalValue = editableEl.innerHTML;
+    textActionState.element = editableEl;
+    textActionState.type = 'contenteditable';
+    textActionState.selectedText = sel.toString();
+    textActionState.selStart = 0;
+    textActionState.selEnd = 0;
+    textActionState.savedRange = sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+    textActionState.originalValue = editableEl.innerHTML;
   }
-  if (!antiAIState.selectedText.trim()) return;
+  if (!textActionState.selectedText.trim()) return;
 
   e.preventDefault();
-  const menu = ensureAntiAIMenu();
-  // Position: keep menu within viewport
-  const menuW = 200;
-  const menuH = 46;
-  const x = Math.min(e.clientX, window.innerWidth - menuW - 8);
-  const y = Math.min(e.clientY, window.innerHeight - menuH - 8);
+  const menu = ensureTextActionsMenu();
+  menu.classList.remove('hidden');
+  menu.style.visibility = 'hidden';
+  menu.style.left = '0px';
+  menu.style.top = '0px';
+  const bounds = menu.getBoundingClientRect();
+  const x = Math.max(8, Math.min(e.clientX, window.innerWidth - bounds.width - 8));
+  const y = Math.max(8, Math.min(e.clientY, window.innerHeight - bounds.height - 8));
   menu.style.left = `${x}px`;
   menu.style.top = `${y}px`;
-  menu.classList.remove('hidden');
+  menu.style.visibility = '';
   hideStage2ContextMenu();
   hideStage3SourceMenu();
 }
 
 // ── Toast helpers ──
 
-function _getOrCreateAntiAIToast() {
-  let toast = document.getElementById('antiAIToast');
+function _getOrCreateTextActionToast() {
+  let toast = document.getElementById('textActionToast');
   if (toast) return toast;
   toast = document.createElement('div');
-  toast.id = 'antiAIToast';
-  toast.className = 'anti-ai-toast hidden';
+  toast.id = 'textActionToast';
+  toast.className = 'text-action-toast hidden';
   document.body.appendChild(toast);
   return toast;
 }
 
-function _clearAntiAITimer() {
-  if (antiAIState.undoTimerId) {
-    clearTimeout(antiAIState.undoTimerId);
-    antiAIState.undoTimerId = null;
+function _clearTextActionTimer() {
+  if (textActionState.undoTimerId) {
+    clearTimeout(textActionState.undoTimerId);
+    textActionState.undoTimerId = null;
   }
 }
 
-function showAntiAILoadingToast() {
-  const toast = _getOrCreateAntiAIToast();
-  toast.className = 'anti-ai-toast';
-  toast.innerHTML = `<span class="anti-ai-toast-msg">✦ Removing AI patterns…</span>`;
-  _clearAntiAITimer();
+function showTextActionLoadingToast(actionKey) {
+  const meta = getTextActionMeta(actionKey);
+  const toast = _getOrCreateTextActionToast();
+  toast.className = 'text-action-toast';
+  toast.innerHTML = `<span class="text-action-toast-msg">${escapeHTML(meta.icon || '✦')} ${escapeHTML(meta.loadingLabel)}</span>`;
+  _clearTextActionTimer();
 }
 
-function showAntiAIUndoToast(element, type, originalValue, selStart, selEnd) {
-  const toast = _getOrCreateAntiAIToast();
-  toast.className = 'anti-ai-toast';
+function showTextActionUndoToast(actionKey, element, type, originalValue, selStart, selEnd) {
+  const meta = getTextActionMeta(actionKey);
+  const toast = _getOrCreateTextActionToast();
+  toast.className = 'text-action-toast';
   toast.innerHTML = `
-    <span class="anti-ai-toast-msg">✦ Writing Anti-AI applied</span>
-    <button class="anti-ai-toast-undo-btn" id="antiAIUndoBtn">Undo</button>
+    <span class="text-action-toast-msg">${escapeHTML(meta.icon || '✦')} ${escapeHTML(meta.successLabel)}</span>
+    <button class="text-action-toast-undo-btn" id="textActionUndoBtn">Undo</button>
   `;
-  _clearAntiAITimer();
+  _clearTextActionTimer();
 
-  document.getElementById('antiAIUndoBtn').addEventListener('click', () => {
+  document.getElementById('textActionUndoBtn').addEventListener('click', () => {
     if (type === 'textarea') {
       element.value = originalValue;
       element.selectionStart = selStart;
@@ -2787,46 +2858,47 @@ function showAntiAIUndoToast(element, type, originalValue, selStart, selEnd) {
       element.innerHTML = originalValue;
       element.dispatchEvent(new Event('input', { bubbles: true }));
     }
-    hideAntiAIToast();
+    hideTextActionToast();
   });
 
-  antiAIState.undoTimerId = setTimeout(hideAntiAIToast, 10000);
+  textActionState.undoTimerId = setTimeout(hideTextActionToast, 10000);
 }
 
-function showAntiAIErrorToast(msg) {
-  const toast = _getOrCreateAntiAIToast();
-  toast.className = 'anti-ai-toast anti-ai-toast--error';
-  toast.innerHTML = `<span class="anti-ai-toast-msg">${escapeHTML(String(msg))}</span>`;
-  _clearAntiAITimer();
-  antiAIState.undoTimerId = setTimeout(hideAntiAIToast, 5000);
+function showTextActionErrorToast(msg) {
+  const toast = _getOrCreateTextActionToast();
+  toast.className = 'text-action-toast text-action-toast--error';
+  toast.innerHTML = `<span class="text-action-toast-msg">${escapeHTML(String(msg))}</span>`;
+  _clearTextActionTimer();
+  textActionState.undoTimerId = setTimeout(hideTextActionToast, 5000);
 }
 
-function hideAntiAIToast() {
-  const toast = document.getElementById('antiAIToast');
+function hideTextActionToast() {
+  const toast = document.getElementById('textActionToast');
   if (toast) toast.classList.add('hidden');
-  _clearAntiAITimer();
+  _clearTextActionTimer();
 }
 
 // ── Core replacement ──
 
-async function runAntiAIReplacement() {
-  const { element, type, selectedText, selStart, selEnd, savedRange, originalValue } = antiAIState;
+async function runSelectedTextAction(actionKey) {
+  const meta = getTextActionMeta(actionKey);
+  const { element, type, selectedText, selStart, selEnd, savedRange, originalValue } = textActionState;
   if (!element || !selectedText.trim()) return;
 
   const providerKey = state.apiSettings.activeApiProvider;
   const profile = getActiveApiProfile(providerKey);
   if (!profile || !profile.apiKey) {
-    showAntiAIErrorToast('Please configure API Settings first.');
+    showTextActionErrorToast('Please configure API Settings first.');
     return;
   }
 
-  showAntiAILoadingToast();
+  showTextActionLoadingToast(actionKey);
 
   try {
-    const result = await window.studioApi.runWritingAntiAI({ providerKey, profile, content: selectedText });
+    const result = await meta.run({ providerKey, profile, content: selectedText });
     fetchAndRenderTokenUsage();
     const newText = `${result?.text || ''}`.trim();
-    if (!newText) throw new Error('Empty response from Writing Anti-AI.');
+    if (!newText) throw new Error(meta.emptyResponseLabel);
 
     if (type === 'textarea') {
       const before = originalValue.substring(0, selStart);
@@ -2841,10 +2913,10 @@ async function runAntiAIReplacement() {
       sel.removeAllRanges();
       if (savedRange) sel.addRange(savedRange);
       if (sel.rangeCount === 0) {
-        // savedRange was null — append at end as fallback
+        // savedRange was null; append at end as fallback.
         element.append(document.createTextNode(newText));
         element.dispatchEvent(new Event('input', { bubbles: true }));
-        showAntiAIUndoToast(element, type, originalValue, selStart, selEnd);
+        showTextActionUndoToast(actionKey, element, type, originalValue, selStart, selEnd);
         return;
       }
       const range = sel.getRangeAt(0);
@@ -2854,9 +2926,9 @@ async function runAntiAIReplacement() {
       element.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
-    showAntiAIUndoToast(element, type, originalValue, selStart, selEnd);
+    showTextActionUndoToast(actionKey, element, type, originalValue, selStart, selEnd);
   } catch (err) {
-    showAntiAIErrorToast(err.message || 'Writing Anti-AI failed.');
+    showTextActionErrorToast(err.message || meta.errorLabel);
   }
 }
 
@@ -2902,6 +2974,20 @@ function applyStage3HeadingPrefix(text, prefix) {
   }).join('\n');
 }
 
+function splitSelectionOuterWhitespace(text = '') {
+  const source = `${text || ''}`;
+  const leading = source.match(/^\s+/)?.[0] || '';
+  const trailing = source.match(/\s+$/)?.[0] || '';
+  const core = source.slice(leading.length, source.length - trailing.length);
+  return { leading, core, trailing };
+}
+
+function applyInlineStage3Format(selected, formatter) {
+  const { leading, core, trailing } = splitSelectionOuterWhitespace(selected);
+  if (!core) return selected;
+  return `${leading}${formatter(core)}${trailing}`;
+}
+
 function applyStage3SourceFormat(formatType) {
   const editor = document.querySelector('textarea.stage3-source-editor');
   if (!editor) return;
@@ -2925,13 +3011,13 @@ function applyStage3SourceFormat(formatType) {
 
   const selected = source.slice(start, end);
   let replacement = selected;
-  if (formatType === 'bold') replacement = `**${selected}**`;
-  if (formatType === 'italic') replacement = `*${selected}*`;
-  if (formatType === 'underline') replacement = `<u>${selected}</u>`;
+  if (formatType === 'bold') replacement = applyInlineStage3Format(selected, (text) => `**${text}**`);
+  if (formatType === 'italic') replacement = applyInlineStage3Format(selected, (text) => `*${text}*`);
+  if (formatType === 'underline') replacement = applyInlineStage3Format(selected, (text) => `<u>${text}</u>`);
   if (formatType === 'color') {
     const hex = normalizeHexColor(state.stage3Settings.color || '#ff0000') || '#ff0000';
     if (isSelectionAlreadyInStage3ColorToken(source, start, end, hex)) return;
-    replacement = `\${\\color{${hex}}\\text{${selected}}}$`;
+    replacement = applyInlineStage3Format(selected, (text) => `\${\\color{${hex}}\\text{${text}}}$`);
   }
   if (formatType === 'h1') replacement = applyStage3HeadingPrefix(selected, '#');
   if (formatType === 'h2') replacement = applyStage3HeadingPrefix(selected, '##');
@@ -3172,6 +3258,9 @@ function renderStage4Panels() {
     </div>`;
 
   const refinedText = stage4.refinedText || '';
+  const previewBody = refinedText
+    ? `<div class="stage5-preview-host stage4-preview-host">${renderStage5PreviewHtml(refinedText)}</div>`
+    : '<p class="breakdown-placeholder">Nothing to preview yet. Click Refine to generate the follow-up response.</p>';
   const progress = stage4.progress || createStage4ProgressState();
   const hasProgress = Boolean(progress.step1?.text || progress.step2?.text || isRunning);
   breakdownContentEl.innerHTML = `
@@ -3183,10 +3272,10 @@ function renderStage4Panels() {
       <div class="breakdown-block">
         <div class="breakdown-section">
           <div class="stage4-section-head">
-            <h4 class="breakdown-section-title">Final Refined Output</h4>
+            <h4 class="breakdown-section-title">Final Refined Output (Preview)</h4>
             <button class="btn" data-stage4-copy-refined="1">Copy</button>
           </div>
-          <textarea class="response-textarea stage4-refined-readonly" readonly>${escapeHTML(refinedText)}</textarea>
+          ${previewBody}
           ${stage4.condensedPath ? `<p class="muted stage4-condensed-path">Condensed context: ${escapeHTML(stage4.condensedPath)}</p>` : ''}
         </div>
       </div>
@@ -6000,9 +6089,9 @@ stage2LeftPanelEl.addEventListener('input', (e) => {
 stage2LeftPanelEl.addEventListener('contextmenu', (e) => {
   const target = e.target;
   if (target?.dataset?.stage2Field === 'outline') {
-    // When text is selected, show Writing Anti-AI instead of insert menu
+    // When text is selected, show selected-text actions instead of insert menu.
     if (target.selectionStart !== target.selectionEnd) {
-      showAntiAIMenu(e, target);
+      showTextActionsMenu(e, target);
       return;
     }
     e.preventDefault();
@@ -6013,7 +6102,7 @@ stage2LeftPanelEl.addEventListener('contextmenu', (e) => {
     menu.style.top = `${e.clientY}px`;
     menu.classList.remove('hidden');
     hideStage3SourceMenu();
-    hideAntiAIMenu();
+    hideTextActionsMenu();
     return;
   }
 
@@ -6027,31 +6116,33 @@ stage2LeftPanelEl.addEventListener('contextmenu', (e) => {
       start: target.selectionStart || 0,
       end: target.selectionEnd || 0,
     };
-    // Pre-populate Anti-AI state so ✦ Anti-AI works if clicked
+    // Pre-populate selected-text state so text actions work if clicked.
     if (target.selectionStart !== target.selectionEnd) {
-      antiAIState.element = target;
-      antiAIState.type = 'textarea';
-      antiAIState.selectedText = target.value.substring(target.selectionStart, target.selectionEnd);
-      antiAIState.selStart = target.selectionStart;
-      antiAIState.selEnd = target.selectionEnd;
-      antiAIState.originalValue = target.value;
-      antiAIState.savedRange = null;
+      textActionState.element = target;
+      textActionState.type = 'textarea';
+      textActionState.selectedText = target.value.substring(target.selectionStart, target.selectionEnd);
+      textActionState.selStart = target.selectionStart;
+      textActionState.selEnd = target.selectionEnd;
+      textActionState.originalValue = target.value;
+      textActionState.savedRange = null;
+    } else {
+      resetTextActionState();
     }
     const menu = ensureStage3SourceMenu();
     menu.style.left = `${e.clientX}px`;
     menu.style.top = `${e.clientY}px`;
     menu.classList.remove('hidden');
     hideStage2ContextMenu();
-    hideAntiAIMenu();
+    hideTextActionsMenu();
   }
 });
 
 breakdownContentEl.addEventListener('contextmenu', (e) => {
   const outlineEl = e.target.closest('textarea[data-stage2-field="outline"]');
   if (!outlineEl) return;
-  // When text is selected, show Writing Anti-AI instead of insert menu
+  // When text is selected, show selected-text actions instead of insert menu.
   if (outlineEl.selectionStart !== outlineEl.selectionEnd) {
-    showAntiAIMenu(e, outlineEl);
+    showTextActionsMenu(e, outlineEl);
     return;
   }
   e.preventDefault();
@@ -6064,10 +6155,10 @@ breakdownContentEl.addEventListener('contextmenu', (e) => {
   menu.style.left = `${stage2OutlineContext.x}px`;
   menu.style.top = `${stage2OutlineContext.y}px`;
   menu.classList.remove('hidden');
-  hideAntiAIMenu();
+  hideTextActionsMenu();
 });
 
-// Global contextmenu handler for Writing Anti-AI on any editable element with a selection
+// Global contextmenu handler for selected-text actions on any editable element with a selection
 document.addEventListener('contextmenu', (e) => {
   const target = e.target;
 
@@ -6077,22 +6168,22 @@ document.addEventListener('contextmenu', (e) => {
 
   if (isTextarea) {
     if (target.selectionStart === target.selectionEnd) return; // no selection
-    // Stage2/Stage3 textareas with selection are already handled above — let those handlers call showAntiAIMenu
+    // Stage2/Stage3 textareas with selection are already handled above.
     // For all other textareas (stage4, stage5, modal textareas, reviewerInput-style textareas) handle here
     const alreadyHandled = target.dataset.stage2Field === 'outline' || target.dataset.stage3Field === 'markdownSource';
     if (alreadyHandled) return;
-    showAntiAIMenu(e, target);
+    showTextActionsMenu(e, target);
   } else if (contentEditableEl) {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
-    showAntiAIMenu(e, contentEditableEl);
+    showTextActionsMenu(e, contentEditableEl);
   }
 });
 
 document.addEventListener('click', (e) => {
-  // Dismiss Anti-AI menu on any outside click
-  if (!e.target.closest('#writingAntiAIMenu')) {
-    hideAntiAIMenu();
+  // Dismiss selected-text actions menu on any outside click.
+  if (!e.target.closest('#textActionsMenu')) {
+    hideTextActionsMenu();
   }
 
   const stage3Fmt = e.target.closest('[data-stage3-format]');
@@ -6101,7 +6192,9 @@ document.addEventListener('click', (e) => {
     hideStage3SourceMenu();
     hideStage2ContextMenu();
     if (action === 'anti-ai') {
-      runAntiAIReplacement();
+      runSelectedTextAction('antiAI');
+    } else if (action === 'condense') {
+      runSelectedTextAction('condense');
     } else if (action) {
       applyStage3SourceFormat(action);
     }
@@ -6142,8 +6235,8 @@ document.addEventListener('keydown', (e) => {
     }
     hideStage2ContextMenu();
     hideStage3SourceMenu();
-    hideAntiAIMenu();
-    hideAntiAIToast();
+    hideTextActionsMenu();
+    hideTextActionToast();
   }
 });
 

@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('studioApi', {
   runStage5FinalRemarks: (payload) => ipcRenderer.invoke('app:stage5:finalize', payload),
   runTemplateRephrase: (payload) => ipcRenderer.invoke('app:template:rephrase', payload),
   runWritingAntiAI: (payload) => ipcRenderer.invoke('app:text:antiAI', payload),
+  runTextCondense: (payload) => ipcRenderer.invoke('app:text:condense', payload),
   pickDocumentMemoryFile: () => ipcRenderer.invoke('documentMemory:pickFile'),
   importDocumentMemory: (payload) => ipcRenderer.invoke('documentMemory:import', payload),
   rebuildDocumentMemory: (payload) => ipcRenderer.invoke('documentMemory:rebuild', payload),

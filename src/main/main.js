@@ -1733,6 +1733,27 @@ Text:
 ${content}`;
 }
 
+function buildTextCondensePrompt(content) {
+  return `You are executing the skills -> utility/stage/text-condense/SKILL.md workflow.
+
+Condense the following text into fewer words while preserving the original meaning.
+
+Rules (follow strictly):
+1. Preserve the original language of the input text.
+2. Remove redundancy, filler, repetition, and unnecessary hedging.
+3. Preserve ALL technical claims, numbers, equations, citations, placeholder tokens, reviewer quotes, and named entities.
+4. Preserve markdown syntax and structural labels if present (for example "> **Reviewer's Comment**:" and "**Response**:").
+5. Do NOT add new information, interpretations, evidence, or promises.
+6. Do NOT change the stance, polarity, or confidence level of any claim.
+7. Keep the same paragraph/list/block structure whenever possible.
+8. If the text is already concise, make only minimal edits.
+
+Return JSON only (no markdown fences) with schema: {"text":"...condensed text..."}.
+
+Text:
+${content}`;
+}
+
 async function runGeminiWritingAntiAI(profile = {}, content = '') {
   const apiKey = (profile.apiKey || '').trim();
   const baseUrl = (profile.baseUrl || '').trim().replace(/\/$/, '') || 'https://generativelanguage.googleapis.com/v1beta';
@@ -1782,6 +1803,58 @@ async function runOpenAIWritingAntiAI(profile = {}, content = '', providerKey = 
   ));
   const out = `${parsed?.text ?? parsed?.draft ?? ''}`.trim();
   if (!out) throw new Error('Writing Anti-AI did not return text.');
+  return { text: out };
+}
+
+async function runGeminiTextCondense(profile = {}, content = '') {
+  const apiKey = (profile.apiKey || '').trim();
+  const baseUrl = (profile.baseUrl || '').trim().replace(/\/$/, '') || 'https://generativelanguage.googleapis.com/v1beta';
+  const model = (profile.model || '').trim() || 'gemini-3-flash-preview';
+  if (!apiKey) throw new Error('Gemini API key is required.');
+  if (!`${content}`.trim()) throw new Error('Text content is empty.');
+
+  const endpoint = `${baseUrl}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const body = {
+    generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
+    contents: [{ role: 'user', parts: [{ text: buildTextCondensePrompt(content) }] }],
+  };
+
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Condense failed (${res.status}): ${detail.slice(0, 240)}`);
+  }
+
+  const data = await res.json();
+  await addTokenUsage(data?.usageMetadata?.promptTokenCount, data?.usageMetadata?.candidatesTokenCount);
+  const text = data?.candidates?.[0]?.content?.parts?.map((p) => p?.text || '').join('')?.trim();
+  if (!text) throw new Error('Gemini returned empty content for Condense.');
+
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/, '').trim();
+    parsed = JSON.parse(cleaned);
+  }
+
+  const out = `${parsed?.text ?? parsed?.draft ?? ''}`.trim();
+  if (!out) throw new Error('Condense did not return text.');
+  return { text: out };
+}
+
+async function runOpenAITextCondense(profile = {}, content = '', providerKey = '') {
+  const prompt = buildTextCondensePrompt(content);
+  const parsed = await requestOpenAICompatibleJson(profile, prompt, providerKey, (text) => (
+    salvageSingleFieldObjectFromText(text, ['text', 'draft'])
+  ));
+  const out = `${parsed?.text ?? parsed?.draft ?? ''}`.trim();
+  if (!out) throw new Error('Condense did not return text.');
   return { text: out };
 }
 
@@ -2204,6 +2277,20 @@ ipcMain.handle('app:text:antiAI', async (_event, payload) => {
     return runOpenAIWritingAntiAI(profile, content, providerKey);
   } else {
     throw new Error(`Writing Anti-AI does not support provider: ${providerKey}`);
+  }
+});
+
+ipcMain.handle('app:text:condense', async (_event, payload) => {
+  const providerKey = payload?.providerKey;
+  const profile = payload?.profile || {};
+  const content = `${payload?.content || ''}`;
+
+  if (providerKey === 'gemini') {
+    return runGeminiTextCondense(profile, content);
+  } else if (['openai', 'deepseek', 'azureOpenai', 'qwen', 'custom', 'openrouter', 'groq', 'grok', 'together', 'kimi', 'minimax', 'huggingface', 'portkey', 'bedrock'].includes(providerKey)) {
+    return runOpenAITextCondense(profile, content, providerKey);
+  } else {
+    throw new Error(`Condense does not support provider: ${providerKey}`);
   }
 });
 

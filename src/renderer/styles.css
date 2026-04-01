@@ -3559,19 +3559,13 @@ html.platform-win32:not([data-theme]) .sidebar {
 }
 
 .stage4-followup-editor,
-.stage4-draft-editor,
-.stage4-refined-readonly {
+.stage4-draft-editor {
   min-height: 220px;
   line-height: 1.55;
   resize: vertical;
 }
 
-.stage4-refined-readonly {
-  cursor: default;
-  background: var(--panel);
-}
-
-.stage4-refined-readonly {
+.stage4-preview-host {
   min-height: 420px;
 }
 
@@ -3773,9 +3767,9 @@ html.platform-win32:not([data-theme]) .sidebar {
   background: rgba(255, 255, 255, 0.1);
 }
 
-/* ────────────────────── Writing Anti-AI Context Menu ────────────────────── */
+/* ────────────────────── Selected Text Actions Menu ────────────────────── */
 
-.writing-anti-ai-menu {
+.text-actions-menu {
   position: fixed;
   z-index: 500;
   min-width: 190px;
@@ -3786,11 +3780,11 @@ html.platform-win32:not([data-theme]) .sidebar {
   padding: 4px;
 }
 
-.writing-anti-ai-menu.hidden {
+.text-actions-menu.hidden {
   display: none;
 }
 
-.writing-anti-ai-menu-item {
+.text-actions-menu-item {
   width: 100%;
   border: none;
   border-radius: 6px;
@@ -3806,17 +3800,13 @@ html.platform-win32:not([data-theme]) .sidebar {
   gap: 8px;
 }
 
-.writing-anti-ai-menu-item:hover {
+.text-actions-menu-item:hover {
   background: var(--hover);
 }
 
-.anti-ai-menu-dots {
-  margin-left: auto;
-}
+/* ────────────────────── Selected Text Action Toast ────────────────────── */
 
-/* ────────────────────── Writing Anti-AI Undo Toast ────────────────────── */
-
-.anti-ai-toast {
+.text-action-toast {
   position: fixed;
   right: 22px;
   bottom: 22px;
@@ -3833,24 +3823,24 @@ html.platform-win32:not([data-theme]) .sidebar {
   max-width: 380px;
   font-size: 0.84rem;
   font-family: 'IBM Plex Mono', monospace;
-  animation: anti-ai-toast-in 0.17s ease;
+  animation: text-action-toast-in 0.17s ease;
 }
 
-.anti-ai-toast.hidden {
+.text-action-toast.hidden {
   display: none;
 }
 
-.anti-ai-toast--error {
+.text-action-toast--error {
   border-color: rgba(220, 70, 60, 0.45);
 }
 
-.anti-ai-toast-msg {
+.text-action-toast-msg {
   flex: 1;
   color: var(--text);
   word-break: break-word;
 }
 
-.anti-ai-toast-undo-btn {
+.text-action-toast-undo-btn {
   flex-shrink: 0;
   border: 1px solid var(--border);
   border-radius: 5px;
@@ -3864,11 +3854,11 @@ html.platform-win32:not([data-theme]) .sidebar {
   white-space: nowrap;
 }
 
-.anti-ai-toast-undo-btn:hover {
+.text-action-toast-undo-btn:hover {
   background: var(--hover);
 }
 
-@keyframes anti-ai-toast-in {
+@keyframes text-action-toast-in {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0);   }
 }

@@ -202,6 +202,20 @@ These skills do not produce structured JSON output for the app pipeline. They se
 
 ---
 
+### `utility/stage/text-condense/SKILL.md`
+
+**Purpose**: Shrink a selected passage into fewer words while preserving meaning, technical accuracy, and local formatting.
+
+**What it provides**:
+- 8-rule condensation workflow focused on redundancy removal rather than rewriting
+- Explicit preservation rules for technical claims, numbers, citations, placeholders, and reviewer quotes
+- Guardrails against meaning drift, added claims, or tone shifts
+- Guidance to keep markdown labels and paragraph/list structure intact whenever possible
+
+**When to consult**: When a Stage 2 reply, Stage 3 source block, Stage 4 follow-up, or Stage 5 summary is too wordy and needs a tighter version without changing the substance.
+
+---
+
 ### `utility/stage/rebuttal-self-review/SKILL.md`
 
 **Purpose**: Pre-submission quality assurance checklist for a completed rebuttal document.
